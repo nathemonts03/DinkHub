@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DinkHub | Login</title>
     <meta name="theme-color" content="#0b2a24" />
-    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="32x32"
+      href="icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <script src="pwa.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -538,5 +540,104 @@
       }
     });
   </script>
+    <!-- PWA install pop-up -->
+    <style>
+      #pwaInstall{position:fixed;inset:0;z-index:9998;display:none;align-items:flex-end;justify-content:center;padding:16px;background:rgba(5,20,17,.7);backdrop-filter:blur(4px)}
+      #pwaInstall.open{display:flex}
+      @media (min-width:640px){#pwaInstall{align-items:center}}
+      #pwaInstall .pwa-card{width:100%;max-width:400px;border:1px solid rgba(215,255,63,.25);border-radius:24px;background:#0f3a32;padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:pwaPop .35s ease-out}
+      #pwaInstall .pwa-head{display:flex;align-items:center;gap:14px}
+      #pwaInstall .pwa-head img{width:56px;height:56px;border-radius:14px}
+      #pwaInstall h2{margin:0;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:20px;font-weight:800;line-height:1.2}
+      #pwaInstall p{margin:12px 0 0;font-size:14px;line-height:1.55;color:rgba(255,255,255,.72)}
+      #pwaInstall .pwa-steps{display:none;margin-top:14px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#0b2a24;padding:12px 14px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.8)}
+      #pwaInstall .pwa-steps.show{display:block}
+      #pwaInstall .pwa-row{display:flex;gap:10px;margin-top:20px}
+      #pwaInstall button{flex:1;cursor:pointer;border-radius:12px;padding:12px 14px;font:600 14px "DM Sans",system-ui,sans-serif;transition:transform .2s,background .2s}
+      #pwaInstall button:active{transform:scale(.98)}
+      #pwaInstall .pwa-yes{border:0;background:#d7ff3f;color:#0b2a24}
+      #pwaInstall .pwa-yes:hover{background:#b9e01f}
+      #pwaInstall .pwa-no{border:1px solid rgba(255,255,255,.18);background:transparent;color:#fff}
+      #pwaInstall .pwa-no:hover{background:rgba(255,255,255,.06)}
+      @keyframes pwaPop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+      @media (prefers-reduced-motion:reduce){#pwaInstall .pwa-card{animation:none}}
+    </style>
+    <div id="pwaInstall" role="dialog" aria-modal="true"
+      aria-labelledby="pwaTitle" aria-describedby="pwaDesc">
+      <div class="pwa-card">
+        <div class="pwa-head">
+          <img src="icons/icon-192.png" alt />
+          <h2 id="pwaTitle">Install the DinkHub app</h2>
+        </div>
+        <p id="pwaDesc">Add DinkHub to your device for faster access, a
+          full-screen experience and quick launch from your home screen.</p>
+        <div class="pwa-steps" id="pwaIosSteps">
+          On iPhone/iPad: tap the <strong>Share</strong> button in Safari, then
+          choose <strong>Add to Home Screen</strong>.
+        </div>
+        <div class="pwa-row">
+          <button type="button" class="pwa-no" id="pwaLater">Not now</button>
+          <button type="button" class="pwa-yes" id="pwaYes">Install</button>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function () {
+      var KEY = "dinkhub_pwa_dismissed_at";
+      var SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // ask again after 7 days
+      var modal = document.getElementById("pwaInstall");
+      var yes = document.getElementById("pwaYes");
+      var later = document.getElementById("pwaLater");
+      var iosSteps = document.getElementById("pwaIosSteps");
+      var deferred = null;
+      var opened = false;
+
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});
+        });
+      }
+
+      var installed = !!(window.DinkPWA && DinkPWA.isInstalled());
+      var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      var snoozed = function () {
+        try { var t = parseInt(localStorage.getItem(KEY) || "0", 10); return t && Date.now() - t < SNOOZE_MS; }
+        catch (_) { return false; }
+      };
+      var close = function (remember) {
+        modal.classList.remove("open");
+        document.documentElement.style.overflow = "";
+        if (remember) { try { localStorage.setItem(KEY, String(Date.now())); } catch (_) {} }
+      };
+      var open = function () {
+        if (opened || installed || snoozed()) return;
+        opened = true;
+        if (!deferred && ios) { iosSteps.classList.add("show"); yes.textContent = "Got it"; }
+        // Wait a moment so the login screen can finish its entrance animation first.
+        setTimeout(function () {
+          modal.classList.add("open");
+          document.documentElement.style.overflow = "hidden";
+          yes.focus();
+        }, 1200);
+      };
+
+      window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; open(); });
+      window.addEventListener("appinstalled", function () { close(false); });
+      // iOS Safari never fires beforeinstallprompt, so show the Add to Home Screen steps instead.
+      if (ios && !installed) open();
+
+      yes.addEventListener("click", async function () {
+        if (deferred) {
+          deferred.prompt();
+          try { await deferred.userChoice; } catch (_) {}
+          deferred = null;
+          close(true);
+        } else close(true); // iOS: user read the steps
+      });
+      later.addEventListener("click", function () { close(true); });
+      modal.addEventListener("click", function (e) { if (e.target === modal) close(true); });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && modal.classList.contains("open")) close(true); });
+    })();
+    </script>
   </body>
 </html>
