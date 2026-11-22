@@ -83,6 +83,7 @@
       body, .view-fade, .step-fade { transition: none; }
     }
   </style>
+      <script src="../pwa.js" data-block-installed="admin"></script>
   </head>
 
   <body class="font-body bg-court-900 text-white min-h-screen">
@@ -1741,6 +1742,7 @@
     // ---------- Guard: only the admin may view this page ----------
     onAuthStateChanged(auth, async (user) => {
       if (loggingOut) return;
+      if (window.DinkPWA && DinkPWA.blocked) return; // installed app: the browser-only pop-up is showing
 
       if (!user) {
         goToLogin();

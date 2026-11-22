@@ -7,6 +7,16 @@
     <meta name="referrer" content="no-referrer" />
     <meta http-equiv="Cache-Control" content="no-store" />
     <title>DinkHub | Referee</title>
+    <!-- PWA: only this page links the manifest, so only the referee view can be installed. -->
+    <link rel="manifest" href="../manifest.webmanifest" />
+    <meta name="theme-color" content="#0b2a24" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="DinkHub" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script src="../pwa.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -233,6 +243,11 @@
                   class="truncate text-xs text-white/45"></p>
               </div>
             </div>
+            <button id="installBtn" type="button"
+              class="mb-2 hidden w-full items-center justify-center gap-2 rounded-xl bg-optic px-4 py-2.5 text-sm font-bold text-court-900 transition duration-300 hover:bg-optic-dark focus:outline-none focus:ring-2 focus:ring-optic/50">
+              <i class="fa-solid fa-download text-sm"></i><span>Install app</span>
+            </button>
+            <p id="installHint" class="mb-3 hidden text-center text-xs text-white/55">On iPhone / iPad: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
             <button id="logoutBtn" type="button"
               class="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition duration-300 hover:border-red-400/50 hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-red-400/30 disabled:cursor-not-allowed disabled:opacity-60">
               <svg id="logoutSpinner"
@@ -1664,6 +1679,37 @@
         showToast(isPermissionError(err) ? "Permission denied. Check the database rules." : "Couldn't save. Please try again.");
       }
     });
+  </script>
+      <script>
+    // PWA: register the service worker and wire up the "Install app" button (referee page only).
+    (function () {
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(function () {});
+        });
+      }
+      var btn = document.getElementById("installBtn");
+      var hint = document.getElementById("installHint");
+      var deferred = null;
+      var installed = !!(window.DinkPWA && DinkPWA.isInstalled());
+      var showBtn = function () { if (!installed) { btn.classList.remove("hidden"); btn.classList.add("flex"); } };
+      var hideBtn = function () { btn.classList.add("hidden"); btn.classList.remove("flex"); hint.classList.add("hidden"); };
+      window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; showBtn(); });
+      window.addEventListener("appinstalled", hideBtn);
+      // iOS Safari has no install prompt; show the button so we can explain Add to Home Screen.
+      var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      if (ios) showBtn();
+      btn.addEventListener("click", async function () {
+        if (deferred) {
+          deferred.prompt();
+          try { await deferred.userChoice; } catch (_) {}
+          deferred = null;
+          hideBtn();
+        } else {
+          hint.classList.toggle("hidden");
+        }
+      });
+    })();
   </script>
   </body>
 </html>

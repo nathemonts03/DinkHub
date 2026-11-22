@@ -60,6 +60,7 @@
       body, #scene { transition: none; }
     }
   </style>
+        <script src="../pwa.js" data-block-installed="operator"></script>
     </head>
 
     <body class="court-bg font-body bg-court-900 text-white min-h-screen">
@@ -444,6 +445,7 @@
 
     onAuthStateChanged(auth, async (user) => {
       if (loggingOut) return;
+      if (window.DinkPWA && DinkPWA.blocked) return; // installed app: the browser-only pop-up is showing
       if (!user) return goToLogin();
       if (user.uid === ADMIN_UID) return goToLogin();
 
