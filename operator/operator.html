@@ -113,6 +113,11 @@
                         <i class="fa-solid fa-tv w-5 text-center"></i>
                         <span class="hidden lg:inline">Broadcast</span>
                     </div>
+                    <button id="navChamp" type="button" title="Championship tracking"
+                        class="flex w-full items-center justify-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/5 hover:text-white focus:outline-none focus:ring-2 focus:ring-optic/40 lg:justify-start">
+                        <i class="fa-solid fa-crown w-5 text-center"></i>
+                        <span class="hidden lg:inline">Championship</span>
+                    </button>
                 </nav>
 
                 <div class="mt-4 border-t border-white/10 pt-4">
@@ -155,6 +160,23 @@
                 <div id="pList"
                     class="mt-8 grid gap-4 sm:grid-cols-2"></div>
 
+                <!-- Championship tracking for the highlighted tournament -->
+                <section id="pChamp" class="mt-12 hidden scroll-mt-6 pb-24">
+                    <div class="flex flex-wrap items-end justify-between gap-4">
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-widest text-optic">Championship tracking</p>
+                            <h2 id="pChampName" class="mt-2 break-words font-display text-2xl font-extrabold tracking-tight sm:text-3xl"></h2>
+                            <p class="mt-1 max-w-2xl text-sm text-white/55">The championship for every category, in the format the admin chose. It opens when every game in every category is completed and the admin starts it, and updates live as referees score the matches.</p>
+                        </div>
+                        <button id="pChampShow" type="button"
+                            class="hidden items-center gap-2 rounded-xl border border-optic/50 px-5 py-2.5 font-display text-sm font-bold text-optic transition hover:bg-optic/10 focus:outline-none focus:ring-2 focus:ring-optic/40">
+                            <i class="fa-solid fa-crown text-xs"></i>Show championship on TV
+                        </button>
+                    </div>
+                    <p id="pChampNote" class="mt-4 hidden rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-sm text-amber-100"></p>
+                    <div id="pChampBody" class="mt-6 space-y-5"></div>
+                </section>
+
                 <div id="pStart"
                     class="sticky bottom-4 mt-8 hidden flex-wrap items-center justify-between gap-4 rounded-2xl border border-optic/30 bg-court-800/95 p-4 shadow-2xl shadow-black/40 backdrop-blur">
                     <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -187,6 +209,11 @@
                                 id="goFull" type="checkbox" checked
                                 class="h-4 w-4 accent-optic" />Go full
                             screen</label>
+                        <label style="display:none"
+                            class="flex cursor-pointer items-center gap-2 text-sm text-white/80"><input
+                                id="champOn" type="checkbox" checked
+                                class="h-4 w-4 accent-optic" /><i class="fa-solid fa-crown text-optic"></i>Show
+                            championship bracket</label>
                     </div>
                     <button id="startBtn" type="button"
                         class="inline-flex items-center gap-2 rounded-xl bg-optic px-6 py-3 font-display text-base font-bold text-court-900 transition hover:bg-optic-dark focus:outline-none focus:ring-2 focus:ring-optic/50">
@@ -277,6 +304,9 @@
                 <button id="hCols" type="button" title="Columns (keys 1 / 2 / 3, 0 = auto)"
                     class="flex h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-white/85 transition hover:bg-white/10"><i
                         class="fa-solid fa-table-columns"></i><span id="hColsLabel">Auto</span></button>
+                <button id="hChamp" type="button" title="Jump to the championship bracket (C)"
+                    class="grid h-11 w-11 place-items-center rounded-xl text-optic transition hover:bg-optic/10"><i
+                        class="fa-solid fa-crown"></i></button>
                 <span class="mx-1 h-6 w-px bg-white/15"></span>
                 <button id="hFull" type="button" title="Full screen (F)"
                     class="grid h-11 w-11 place-items-center rounded-xl text-white/85 transition hover:bg-white/10"><i
@@ -320,7 +350,12 @@
     let tid = "";                 // tournament being broadcast
     let pickId = "";              // tournament highlighted on the picker
     let games = [], scores = {};
-    let unsubGames = null, unsubScores = null, unsubConn = null;
+    let unsubGames = null, unsubScores = null, unsubConn = null, unsubPlayoffs = null;
+    let playoffs = {};            // championship matches: category -> match id -> record (playoffs/<tournamentId>)
+    let champOn = true;           // show the championship bracket scenes on the TV
+    let jumpUntil = 0;            // "Show championship on TV": land on the bracket as soon as it is ready
+    // Championship tracking shown on the picker for the highlighted tournament.
+    let pk = { id: "", games: [], scores: {}, playoffs: {}, err: "", poErr: "", unsubs: [] };
     let loadError = "";
     let broadcasting = false;
     let speed = 15;               // seconds per scene
@@ -491,6 +526,8 @@
         tournaments = [...upcoming, ...past];
 
         try { speed = Number(localStorage.getItem("dinkhub_op_speed")) || 15; } catch (_) {}
+        champOn = true;   // the TV is championship-only now
+        $("champOn").checked = true;
         $("speed").value = String(speed);
         try { const v = Number(localStorage.getItem("dinkhub_op_cols")); colSetting = [1, 2, 3].includes(v) ? v : 0; } catch (_) {}
         $("colsSel").value = String(colSetting);
@@ -519,6 +556,7 @@
       $("pStart").classList.toggle("flex", Boolean(tournaments.length));
       if (!tournaments.length) {
         state.textContent = "No tournaments with games yet. Check back once the admin has generated games.";
+        $("pChamp").classList.add("hidden");
         state.classList.remove("hidden");
         return;
       }
@@ -552,6 +590,8 @@
         b.addEventListener("click", () => { pickId = t.id; renderPicker(); });
         list.appendChild(b);
       });
+      watchPicker();
+      renderTracking();
     }
 
     $("speed").addEventListener("change", (e) => {
@@ -559,6 +599,22 @@
       try { localStorage.setItem("dinkhub_op_speed", String(speed)); } catch (_) {}
     });
     $("colsSel").addEventListener("change", (e) => setCols(Number(e.target.value) || 0));
+    $("champOn").addEventListener("change", (e) => {
+      champOn = e.target.checked;
+      try { localStorage.setItem("dinkhub_op_champ", champOn ? "1" : "0"); } catch (_) {}
+    });
+    $("pChampShow").addEventListener("click", () => {
+      if (!pickId) return;
+      champOn = true;
+      $("champOn").checked = true;
+      try { localStorage.setItem("dinkhub_op_champ", "1"); } catch (_) {}
+      startBroadcast(pickId, $("goFull").checked, true);
+    });
+    $("navChamp").addEventListener("click", () => {
+      const s = $("pChamp");
+      if (s.classList.contains("hidden")) { showToast("Pick a tournament with games to track its championship."); return; }
+      s.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     $("startBtn").addEventListener("click", () => {
       if (!pickId) return;
       startBroadcast(pickId, $("goFull").checked);
@@ -566,11 +622,12 @@
 
     // ---------- Broadcast lifecycle ----------
     function stopListeners() {
-      [unsubGames, unsubScores, unsubConn].forEach((u) => { if (u) u(); });
-      unsubGames = unsubScores = unsubConn = null;
+      [unsubGames, unsubScores, unsubConn, unsubPlayoffs].forEach((u) => { if (u) u(); });
+      unsubGames = unsubScores = unsubConn = unsubPlayoffs = null;
     }
     function stopBroadcastLoops() {
       stopListeners();
+      stopPickerWatch();
       clearTimeout(sceneTimer);
       sceneTimer = null;
       if (rafId) cancelAnimationFrame(rafId);
@@ -587,12 +644,13 @@
     }
     document.addEventListener("visibilitychange", () => { if (broadcasting && document.visibilityState === "visible") requestWakeLock(); });
 
-    function startBroadcast(id, fullscreen) {
+    function startBroadcast(id, fullscreen, showChampionship) {
       stopBroadcastLoops();
       tid = id;
+      jumpUntil = showChampionship ? Date.now() + 8000 : 0;
       broadcasting = true;
       paused = false;
-      games = []; scores = {}; loadError = "";
+      games = []; scores = {}; playoffs = {}; loadError = "";
       playlist = []; idx = 0; curKey = "";
       lastSeen = new Map(); lastTicker = "";
       try { localStorage.setItem("dinkhub_op_tid", id); localStorage.setItem("dinkhub_op_live", id); } catch (_) {}
@@ -630,6 +688,16 @@
       }, (err) => {
         if (tid !== t) return;
         loadError = isPermissionError(err) ? "Permission denied. The database rules don't allow operators to read scores yet." : "Couldn't load scores.";
+        onData();
+      });
+      // Championship matches. If the rules don't let this account read them, the rest of the broadcast carries on.
+      unsubPlayoffs = onValue(ref(db, "playoffs/" + t), (s) => {
+        if (tid !== t) return;
+        playoffs = s.val() || {};
+        onData();
+      }, () => {
+        if (tid !== t) return;
+        playoffs = {};
         onData();
       });
       unsubConn = onValue(ref(db, ".info/connected"), (s) => {
@@ -688,6 +756,7 @@
     $("hPause").addEventListener("click", togglePause);
     $("hCols").addEventListener("click", () => setCols((colSetting + 1) % 4));
     $("hFull").addEventListener("click", goFullscreen);
+    $("hChamp").addEventListener("click", jumpChamp);
     $("hChange").addEventListener("click", stopBroadcast);
     document.addEventListener("keydown", (e) => {
       if (!broadcasting) return;
@@ -695,6 +764,7 @@
       else if (e.key === "ArrowLeft") step(-1);
       else if (e.key === " ") { e.preventDefault(); togglePause(); }
       else if (e.key === "f" || e.key === "F") goFullscreen();
+      else if (e.key === "c" || e.key === "C") jumpChamp();
       else if (e.key === "0" || e.key === "1" || e.key === "2" || e.key === "3") setCols(Number(e.key));
       else if (e.key === "Escape" && !document.fullscreenElement) stopBroadcast();
       wakeHud();
@@ -996,8 +1066,7 @@
       return wrap;
     }
 
-    function podium(c) {
-      const top = c.rows.slice(0, 3);
+    function podium(top) {
       const wrap = el("div", "flex h-full items-end justify-center gap-8 pb-4");
       const order = [top[1], top[0], top[2]];
       const meta = [{ r: 2, h: "h-[420px]", icon: "text-slate-300" }, { r: 1, h: "h-[560px]", icon: "text-optic" }, { r: 3, h: "h-[360px]", icon: "text-amber-500" }];
@@ -1017,11 +1086,308 @@
       return wrap;
     }
 
+    // ---------- Championship (semi-finals, third place, final) ----------
+    // Matches live in playoffs/<tournamentId>/<category>/<sf1|sf2|third|final>, written by the referees. The teams are
+    // never stored as fixtures: they come from the standings (top 4) and earlier results, exactly as on the admin page.
+        // TV rule: the championship is never shown while any regular game is still live or still to be played.
+    let tvChampMode = false;   // true while the TV is showing the championship instead of the regular scenes
+    const tvGamesDone = () => games.length > 0 && games.every((g) => statusOf(g) === "completed");
+    // The championship only opens once every game of EVERY category is completed (none still being played).
+    let chAllDone = false;
+    const allCatsDone = (cats) => cats.length > 0 && cats.every((x) => x.done === x.total && x.live === 0);
+    function chBracket(c, po) {
+      po = po || {};
+      const unlocked = c.total > 0 && c.done === c.total && c.live === 0 && c.rows.length >= 4 && chAllDone;   // chAllDone: every game of every category
+      const top = c.rows.slice(0, 4);
+      const mk = (id, label, t1, t2, seeds, ph) => {
+        const known = Boolean(t1 && t2);
+        let m = po[id] || null;
+        if (m && (!known || m.team1 !== t1.name || m.team2 !== t2.name)) m = null;   // teams changed since it was saved
+        const done = Boolean(m && m.status === "completed" && Number(m.team1Score) !== Number(m.team2Score));
+        const live = Boolean(m && m.status === "live");
+        const s1 = m ? Number(m.team1Score) || 0 : 0, s2 = m ? Number(m.team2Score) || 0 : 0;
+        return { id, label, t1, t2, seeds, ph, known, m, done, live, s1, s2,
+          w: done ? (s1 > s2 ? t1 : t2) : null, l: done ? (s1 > s2 ? t2 : t1) : null };
+      };
+      // The admin picks the format before the championship starts (playoffs/<tid>/<category>/format):
+      //   "final" = championship only, "finals" = finals + championship, "semis" = semi-finals + finals + championship.
+      // Older tournaments with matches but no saved format are treated as "semis".
+      const fmt = (po.format === "final" || po.format === "finals" || po.format === "semis") ? po.format
+        : ((po.sf1 || po.sf2 || po.third || po.final) ? "semis" : "");
+      let matches, champion, runnerUp, thirdPlace = null;
+      if (fmt === "final") {
+        const fin = mk("final", "Championship match", top[0], top[1], [1, 2], ["1st place", "2nd place"]);
+        matches = [fin]; champion = fin.w; runnerUp = fin.l;
+      } else if (fmt === "finals") {
+        const third = mk("third", "Third-place match", top[2], top[3], [3, 4], ["3rd place", "4th place"]);
+        const fin = mk("final", "Championship match", top[0], top[1], [1, 2], ["1st place", "2nd place"]);
+        matches = [third, fin]; champion = fin.w; runnerUp = fin.l; thirdPlace = third.w;
+      } else {
+        const sf1 = mk("sf1", "Semi-final 1", top[0], top[3], [1, 4], ["1st place", "4th place"]);
+        const sf2 = mk("sf2", "Semi-final 2", top[1], top[2], [2, 3], ["2nd place", "3rd place"]);
+        const third = mk("third", "Third-place match", sf1.l, sf2.l, null, ["Loser of Semi-final 1", "Loser of Semi-final 2"]);
+        const fin = mk("final", "Championship match", sf1.w, sf2.w, null, ["Winner of Semi-final 1", "Winner of Semi-final 2"]);
+        matches = [sf1, sf2, third, fin]; champion = fin.w; runnerUp = fin.l; thirdPlace = third.w;
+      }
+      return { unlocked, started: Boolean(fmt), open: unlocked && Boolean(fmt), format: fmt, matches, champion, runnerUp, thirdPlace };
+    }
+
+    // Categories with enough teams for a championship, with their bracket.
+    function champInfo() {
+      const all = computeStandings(currentT(), games, scores).filter((c) => c.rows.length);
+      chAllDone = allCatsDone(all) && tvGamesDone();
+      return all.filter((c) => c.rows.length >= 4).map((c) => ({ c, br: chBracket(c, playoffs[c.key]) }));
+    }
+
+    // Text sizes for one match card: on the TV (big and small) and on the operator page.
+    const CH_Z = {
+      tv:   { pad: "p-6", lab: "text-[24px]", chip: "text-[20px] px-4 py-1", nm: "text-[36px]", pl: "text-[20px]", sc: "text-[58px]", seed: "text-[22px] px-3 py-1", gap: "space-y-3", ph: "text-[28px]" },
+      tvSm: { pad: "p-5", lab: "text-[20px]", chip: "text-[18px] px-3 py-1", nm: "text-[30px]", pl: "text-[18px]", sc: "text-[46px]", seed: "text-[19px] px-2.5 py-0.5", gap: "space-y-2", ph: "text-[24px]" },
+      mini: { pad: "p-4", lab: "text-xs", chip: "text-[11px] px-2.5 py-1", nm: "text-base", pl: "text-xs", sc: "text-2xl", seed: "text-[10px] px-1.5 py-0.5", gap: "space-y-2", ph: "text-sm" },
+    };
+
+    function chMatchCard(mt, catKey, z) {
+      const state = mt.live ? "live" : mt.done ? "done" : mt.known ? "ready" : "wait";
+      const card = el("div", "flex min-w-0 flex-col justify-between rounded-3xl border " + z.pad + " " + {
+        live: "border-optic/60 bg-optic/10", done: "border-emerald-400/30 bg-court-800/80",
+        ready: "border-optic/30 bg-court-800/80", wait: "border-white/10 bg-court-800/40",
+      }[state]);
+      const top = el("div", "flex items-center justify-between gap-3");
+      top.appendChild(el("p", "truncate font-display font-bold uppercase tracking-widest text-white/60 " + z.lab, mt.label));
+      const chip = el("span", "inline-flex shrink-0 items-center gap-2 rounded-full font-display font-bold uppercase tracking-widest " + z.chip + " " + {
+        live: "bg-optic text-court-900", done: "bg-emerald-400/20 text-emerald-200", ready: "bg-white/10 text-white/70", wait: "bg-white/5 text-white/40",
+      }[state]);
+      if (state === "live") chip.appendChild(el("span", "live-dot h-2.5 w-2.5 rounded-full bg-court-900"));
+      chip.appendChild(document.createTextNode({ live: "Live", done: "Final", ready: "Up next", wait: "Waiting" }[state]));
+      top.appendChild(chip);
+
+      const rows = el("div", z.gap);
+      [1, 2].forEach((side) => {
+        const team = side === 1 ? mt.t1 : mt.t2;
+        const win = mt.done && (side === 1 ? mt.s1 > mt.s2 : mt.s2 > mt.s1);
+        const r = el("div", "flex items-center gap-4");
+        if (mt.seeds) r.appendChild(el("span", "shrink-0 rounded-lg bg-white/10 font-display font-bold text-white/60 " + z.seed, "#" + mt.seeds[side - 1]));
+        const info = el("div", "min-w-0 flex-1");
+        if (team) {
+          info.append(
+            el("p", "truncate font-display font-extrabold leading-tight " + z.nm + " " + (win ? "text-optic" : mt.done ? "text-white/55" : "text-white"), team.name),
+            el("p", "truncate text-white/50 " + z.pl, (team.players || []).join(" & "))
+          );
+        } else info.appendChild(el("p", "truncate italic text-white/35 " + z.ph, mt.ph[side - 1]));
+        r.appendChild(info);
+        if (team && (mt.done || mt.live)) {
+          r.appendChild(scoreNumber(side === 1 ? mt.s1 : mt.s2,
+            "font-display font-extrabold leading-none " + z.sc + " " + (mt.done ? (win ? "text-optic" : "text-white/45") : "text-white"),
+            "po|" + catKey + "|" + mt.id + ":" + (side === 1 ? "a" : "b")));
+        }
+        rows.appendChild(r);
+      });
+      card.append(top, rows);
+      return card;
+    }
+
+    // Shown on the TV as soon as a category's games are all completed, until the admin starts the championship.
+    function qualifiersScene(c) {
+      const wrap = el("div", "flex h-full flex-col items-center justify-center gap-10");
+      wrap.appendChild(el("p", "font-display text-[34px] font-bold uppercase tracking-widest text-white/55", "Top 4 teams advance \u00b7 bracket coming up"));
+      const grid = el("div", "grid w-full grid-cols-2 gap-6");
+      c.rows.slice(0, 4).forEach((r, i) => {
+        const card = el("div", "flex items-center gap-6 rounded-3xl border border-optic/30 bg-court-800/80 p-6");
+        card.appendChild(el("span", "grid h-[72px] w-[72px] shrink-0 place-items-center rounded-2xl bg-optic font-display text-[38px] font-extrabold text-court-900", "#" + (i + 1)));
+        const info = el("div", "min-w-0 flex-1");
+        info.append(el("p", "truncate font-display text-[40px] font-extrabold leading-tight", r.name), el("p", "truncate text-[22px] text-white/55", (r.players || []).join(" & ")));
+        card.appendChild(info);
+        grid.appendChild(card);
+      });
+      wrap.appendChild(grid);
+      return wrap;
+    }
+
+    // The bracket on the TV: semi-final 1 -> championship <- semi-final 2, the champion on top, third place below.
+    function bracketScene(c, br) {
+      const W = 1808, SF_W = 540, FIN_W = 580, FIN_X = (W - FIN_W) / 2, Y = 160, H = 260;
+      const byId = (id) => br.matches.find((m) => m.id === id);
+      const sf1 = byId("sf1"), sf2 = byId("sf2"), third = byId("third"), fin = byId("final");
+      const wrap = el("div", "relative mx-auto h-full");
+      wrap.style.width = W + "px";
+      const put = (node, x, y, w, h) => {
+        Object.assign(node.style, { position: "absolute", left: x + "px", top: y + "px", width: w + "px", height: h + "px" });
+        wrap.appendChild(node);
+        return node;
+      };
+      // Lines that join the semi-finals to the championship; they light up once that semi-final has a winner.
+      const line = (x, y, w, h, on) => put(el("div", "rounded-full " + (on ? "bg-optic" : "bg-white/20")), x, y, w, h);
+      if (sf1 && sf2) {
+        line(SF_W, Y + H / 2 - 2, FIN_X - SF_W, 4, sf1.done);
+        line(FIN_X + FIN_W, Y + H / 2 - 2, W - SF_W - (FIN_X + FIN_W), 4, sf2.done);
+      }
+      line(FIN_X + FIN_W / 2 - 2, 140, 4, 20, Boolean(br.champion));
+
+      if (sf1 && sf2) {
+        put(chMatchCard(sf1, c.key, CH_Z.tv), 0, Y, SF_W, H);
+        put(chMatchCard(sf2, c.key, CH_Z.tv), W - SF_W, Y, SF_W, H);
+      }
+      put(chMatchCard(fin, c.key, CH_Z.tv), FIN_X, Y, FIN_W, H);
+      if (third) put(chMatchCard(third, c.key, CH_Z.tvSm), FIN_X, Y + H + 20, FIN_W, 240);
+
+      const champ = el("div", "flex items-center gap-6 rounded-3xl border px-6 py-3 " + (br.champion ? "border-optic/70 bg-optic/10" : "border-white/10 bg-court-800/40"));
+      const icon = el("span", "grid h-[88px] w-[88px] shrink-0 place-items-center rounded-full text-[44px] " + (br.champion ? "bg-optic text-court-900" : "bg-white/10 text-white/35"));
+      icon.appendChild(el("i", "fa-solid fa-trophy"));
+      const txt = el("div", "min-w-0 flex-1");
+      txt.append(
+        el("p", "font-display text-[20px] font-bold uppercase tracking-widest " + (br.champion ? "text-optic/80" : "text-white/45"), "Champions"),
+        el("p", "truncate font-display font-extrabold leading-tight " + (br.champion ? "text-[40px] text-white" : "text-[32px] italic text-white/35"), br.champion ? br.champion.name : "To be decided"),
+        el("p", "truncate text-[18px] text-white/55", br.champion ? (br.champion.players || []).join(" & ") : "")
+      );
+      champ.append(icon, txt);
+      put(champ, FIN_X, 0, FIN_W, 140);
+      return wrap;
+    }
+
+    // Jump to the next championship scene (button on the controls, or the C key).
+    function jumpChamp() {
+      let j = -1;
+      for (let k = 1; k <= playlist.length; k++) {
+        const n = (idx + k) % playlist.length;
+        if (playlist[n].key.startsWith("bracket:")) { j = n; break; }
+      }
+      if (j < 0) {
+        showToast("The championship appears once every game in every category is completed and the admin has started it.");
+        return;
+      }
+      idx = j;
+      showScene(true, false);
+    }
+
+    // ---------- Championship tracking on the operator page ----------
+    function stopPickerWatch() {
+      pk.unsubs.forEach((u) => { try { u(); } catch (_) {} });
+      pk = { id: "", games: [], scores: {}, playoffs: {}, err: "", poErr: "", unsubs: [] };
+    }
+    function watchPicker() {
+      if (broadcasting || !pickId) return;
+      if (pk.id === pickId && pk.unsubs.length) return;
+      stopPickerWatch();
+      const id = pickId;
+      const mine = pk = { id, games: [], scores: {}, playoffs: {}, err: "", poErr: "", unsubs: [] };
+      const fail = (field, what) => (err) => {
+        if (pk !== mine) return;
+        mine[field] = isPermissionError(err) ? "Permission denied. The database rules don't allow operators to read " + what + " yet." : "Couldn't load " + what + ".";
+        renderTracking();
+      };
+      mine.unsubs.push(
+        onValue(ref(db, "games/" + id), (s) => {
+          if (pk !== mine) return;
+          mine.games = [];
+          if (s.exists()) s.forEach((g) => { mine.games.push({ id: g.key, ...g.val() }); });
+          mine.err = "";
+          renderTracking();
+        }, fail("err", "games")),
+        onValue(ref(db, "scores/" + id), (s) => {
+          if (pk !== mine) return;
+          mine.scores = s.val() || {};
+          renderTracking();
+        }, fail("err", "scores")),
+        onValue(ref(db, "playoffs/" + id), (s) => {
+          if (pk !== mine) return;
+          mine.playoffs = s.val() || {};
+          mine.poErr = "";
+          renderTracking();
+        }, fail("poErr", "the championship (playoffs/" + id + ")"))
+      );
+    }
+
+    function trackCard(c) {
+      const br = c.rows.length >= 4 ? chBracket(c, (pk.playoffs || {})[c.key]) : null;
+      const card = el("div", "rounded-2xl border border-white/10 bg-court-800/60 p-5");
+      const head = el("div", "flex flex-wrap items-center justify-between gap-3");
+      head.appendChild(el("h3", "font-display text-xl font-extrabold tracking-tight text-optic", catLabel(c.key)));
+      const badgeTxt = !br ? "Needs 4+ teams" : br.champion ? "Champions crowned" : br.open ? (br.matches.some((m) => m.live) ? "Championship live" : "Championship open") : br.unlocked ? "Waiting for admin" : "Locked";
+      const badge = el("span", "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold " +
+        (br && br.champion ? "bg-optic/15 text-optic" : br && br.open ? "bg-sky-400/15 text-sky-200" : br && br.unlocked ? "bg-amber-300/15 text-amber-200" : "bg-white/10 text-white/60"));
+      badge.appendChild(el("i", "fa-solid " + (br && br.champion ? "fa-crown" : br && br.open ? "fa-bolt" : br && br.unlocked ? "fa-hourglass-half" : "fa-lock")));
+      badge.appendChild(document.createTextNode(badgeTxt));
+      head.appendChild(badge);
+      card.appendChild(head);
+
+      // Regular-season progress: the championship opens at 100%.
+      const pct = c.total ? Math.round((c.done / c.total) * 100) : 0;
+      const prog = el("div", "mt-4");
+      const bar = el("div", "h-2 overflow-hidden rounded-full bg-white/10");
+      const fill = el("div", "h-full rounded-full " + (pct === 100 ? "bg-optic" : "bg-optic/60"));
+      fill.style.width = pct + "%";
+      bar.appendChild(fill);
+      prog.append(bar, el("p", "mt-2 text-xs text-white/50", c.done + " of " + c.total + " games completed" + (c.live ? " · " + c.live + " live" : "") + " · " + c.rows.length + (c.rows.length === 1 ? " team" : " teams")));
+      card.appendChild(prog);
+
+      if (!br) {
+        card.appendChild(el("p", "mt-4 text-sm text-white/55", "A championship needs at least 4 teams, and this category has " + c.rows.length + "."));
+        return card;
+      }
+      if (!br.open) {
+        card.appendChild(el("p", "mt-4 text-sm text-white/55", br.unlocked
+          ? "All games are completed. The championship opens once the admin chooses its format and starts it."
+          : "The championship opens when every game in every category is completed" + (c.live ? " and none are live." : ".")));
+        return card;
+      }
+
+      const byId = (id) => br.matches.find((m) => m.id === id);
+      const sf1 = byId("sf1"), sf2 = byId("sf2"), third = byId("third"), fin = byId("final");
+      const hasSemi = Boolean(sf1 && sf2);
+      const colHead = (txt) => el("p", "mb-2 text-xs font-semibold uppercase tracking-widest text-white/45", txt);
+      const chev = () => el("div", "hidden place-items-center text-optic/60 lg:grid", "").appendChild(el("i", "fa-solid fa-chevron-right")).parentNode;
+      const grid = el("div", "mt-5 grid items-center gap-4 " + (hasSemi ? "lg:grid-cols-[1fr_auto_1fr_auto_1fr]" : "lg:grid-cols-[1fr_auto_1fr]"));
+      const col1 = el("div", "space-y-3"), col2 = el("div", "space-y-3"), col3 = el("div");
+      if (hasSemi) col1.append(colHead("Semi-finals"), chMatchCard(sf1, c.key, CH_Z.mini), chMatchCard(sf2, c.key, CH_Z.mini));
+      col2.append(colHead(third ? "Finals" : "Championship"), chMatchCard(fin, c.key, CH_Z.mini));
+      if (third) col2.append(chMatchCard(third, c.key, CH_Z.mini));
+      const champ = el("div", "rounded-2xl border p-5 text-center " + (br.champion ? "border-optic/60 bg-optic/10" : "border-white/10 bg-court-900/40"));
+      champ.append(
+        el("i", "fa-solid fa-trophy text-4xl " + (br.champion ? "text-optic" : "text-white/25")),
+        el("p", "mt-3 text-xs font-semibold uppercase tracking-widest " + (br.champion ? "text-optic/80" : "text-white/40"), "Champions"),
+        el("p", "mt-1 break-words font-display text-xl font-extrabold " + (br.champion ? "text-white" : "italic text-white/35"), br.champion ? br.champion.name : "To be decided"),
+        el("p", "mt-1 break-words text-xs text-white/55", br.champion ? (br.champion.players || []).join(" & ") : "")
+      );
+      if (br.champion && br.runnerUp) champ.appendChild(el("p", "mt-3 text-xs text-white/50", "Runner-up: " + br.runnerUp.name));
+      if (br.thirdPlace) champ.appendChild(el("p", "mt-1 text-xs text-white/50", "Third place: " + br.thirdPlace.name));
+      col3.append(colHead("Champions"), champ);
+      if (hasSemi) grid.append(col1, chev());
+      grid.append(col2, chev(), col3);
+      card.appendChild(grid);
+      return card;
+    }
+
+    function renderTracking() {
+      const sec = $("pChamp"), body = $("pChampBody");
+      const t = tournaments.find((x) => x.id === pickId);
+      if (broadcasting || !t || !tournaments.length) { sec.classList.add("hidden"); return; }
+      sec.classList.remove("hidden");
+      $("pChampName").textContent = t.name || "Untitled";
+      const note = $("pChampNote");
+      const msg = pk.err || pk.poErr;
+      note.textContent = pk.poErr && !pk.err ? pk.poErr + " The championship will show as waiting until it is allowed." : msg;
+      note.classList.toggle("hidden", !msg);
+      body.replaceChildren();
+      const cats = computeStandings(t, pk.games, pk.scores).filter((c) => c.rows.length);
+      chAllDone = allCatsDone(cats);
+      let open = false;
+      if (!cats.length) {
+        body.appendChild(el("p", "text-sm text-white/50", pk.id === pickId && (pk.games.length || pk.err) ? "This tournament has no teams yet." : "Loading the championship..."));
+      }
+      cats.forEach((c) => {
+        if (c.rows.length >= 4 && chBracket(c, (pk.playoffs || {})[c.key]).unlocked) open = true;
+        body.appendChild(trackCard(c));
+      });
+      const show = $("pChampShow");
+      show.classList.toggle("hidden", !open);
+      show.classList.toggle("inline-flex", open);
+    }
+
     // ---------- Playlist ----------
     function buildPlaylist() {
       const t = currentT();
       if (loadError) return [{ key: "error", title: "", build: () => sceneMessage(loadError, "fa-triangle-exclamation") }];
-      if (!games.length) return [{ key: "empty", title: "", build: () => sceneMessage("The schedule will appear here soon", "fa-hourglass-half") }];
+      if (!games.length) return [{ key: "empty", title: "", build: () => sceneMessage("The championship will appear here soon", "fa-hourglass-half") }];
 
       const live = games.filter((g) => statusOf(g) === "live").sort(byOrder);
       const upcoming = games.filter((g) => statusOf(g) === "scheduled").sort(byRound);
@@ -1049,7 +1415,15 @@
         },
       }));
 
-      if (live.length) livePages();
+      // Championship mode: every regular game is completed AND the admin has started the championship
+      // (or no category is big enough for one). Before that the TV shows the regular scenes below.
+      chAllDone = allCatsDone(standings) && tvGamesDone();
+      const eligible = standings.filter((c) => c.rows.length >= 4);
+      const champMode = chAllDone && (!eligible.length || eligible.some((c) => chBracket(c, playoffs[c.key]).started));
+      tvChampMode = champMode;
+
+      if (!champMode) {
+        if (live.length) livePages();
 
       // Up next: every game still to play on ONE page that scrolls down by itself.
       if (upcoming.length) list.push({
@@ -1107,18 +1481,39 @@
         });
       }
 
-      standings.forEach((c) => {
-        if (c.total > 0 && c.done === c.total && c.rows.length) list.push({
-          key: "champ:" + c.key, title: "Champions · " + catLabel(c.key), icon: "fa-trophy", sub: "Final standings", build: () => podium(c),
+      }
+
+      if (champMode) standings.forEach((c) => {
+        if (!(c.total > 0 && c.done === c.total && c.rows.length && chAllDone)) return;
+        if (c.rows.length < 4) {   // too few teams for a championship: the standings leaders are the champions
+          list.push({ key: "champ:" + c.key, title: "Champions · " + catLabel(c.key), icon: "fa-trophy", sub: "Final standings", build: () => podium(c.rows.slice(0, 3)) });
+          return;
+        }
+        const br = chBracket(c, playoffs[c.key]);
+        if (!br.unlocked) return;   // shows as soon as every game in the category is completed
+        if (!br.started) {      // the admin hasn't picked a format yet: show who qualified
+          list.push({ key: "bracket:" + c.key, title: "Championship \u00b7 " + catLabel(c.key), icon: "fa-crown", sub: "Final standings", build: () => qualifiersScene(c) });
+          return;
+        }
+        list.push({
+          key: "bracket:" + c.key, title: "Championship · " + catLabel(c.key), icon: "fa-crown", pulse: br.matches.some((m) => m.live),
+          sub: br.champion ? "Champions crowned" : br.format === "final" ? "Championship match" : br.format === "finals" ? "Finals · Championship" : "Semi-finals · Third place · Final",
+          build: () => bracketScene(c, br),
+        });
+        if (br.champion) list.push({
+          key: "champ:" + c.key, title: "Champions · " + catLabel(c.key), icon: "fa-trophy", sub: "Championship result",
+          build: () => podium([br.champion, br.runnerUp, br.thirdPlace]),
         });
       });
 
-      if (live.length) livePages();
+      if (!champMode) {
 
-      chunk(finished, lc === 1 ? 7 : lc === 2 ? 6 : 9).slice(0, 2).forEach((p, i, all) => list.push({
-        key: "res" + i, title: "Recent results", icon: "fa-flag-checkered", sub: finished.length + " played" + (all.length > 1 ? " · Page " + (i + 1) + " of " + all.length : ""),
-        build: () => gamesBox(p, false),
-      }));
+      // Recent results: every finished game (newest first) on ONE page that scrolls down by itself.
+      if (finished.length) list.push({
+        key: "res", title: "Recent results", icon: "fa-flag-checkered", scroll: true,
+        sub: finished.length + (finished.length === 1 ? " game" : " games") + " played",
+        build: () => gamesBox(finished, false),
+      });
 
       const all = games.slice().sort(byRound);
       list.push({
@@ -1126,6 +1521,10 @@
         sub: all.length + (all.length === 1 ? " game" : " games"),
         build: () => gamesBox(all, true),
       });
+
+      }
+
+      if (!list.length) list.push({ key: "champ-wait", title: "", build: () => sceneMessage("The schedule will appear here soon", "fa-hourglass-half") });
 
       return list;
     }
@@ -1226,10 +1625,17 @@
         const sc = scoreOf(g) || {};
         now.set(g.id, (Number(sc.team1Score) || 0) + "-" + (Number(sc.team2Score) || 0) + "-" + statusOf(g));
       });
+      Object.keys(playoffs || {}).forEach((cat) => {
+        Object.keys(playoffs[cat] || {}).forEach((mid) => {
+          if (mid === "format") return;
+          const m = playoffs[cat][mid] || {};
+          now.set("po|" + cat + "|" + mid, (Number(m.team1Score) || 0) + "-" + (Number(m.team2Score) || 0) + "-" + (m.status || ""));
+        });
+      });
       now.forEach((sig, id) => {
         const prev = lastSeen.get(id);
         if (prev !== undefined && prev !== sig) {
-          document.querySelectorAll('[data-score-key^="' + id + ':"]').forEach((n) => n.classList.add("pop"));
+          document.querySelectorAll('[data-score-key^="' + id.replace(/"/g, "") + ':"]').forEach((n) => n.classList.add("pop"));
         }
       });
       lastSeen = now;
@@ -1249,8 +1655,13 @@
       const at = playlist.findIndex((s) => s.key === curKey);
       if (at >= 0) idx = at;
       else idx = Math.min(idx, playlist.length - 1);
+      let keep = at >= 0 && !wasEmpty;
+      if (Date.now() < jumpUntil) {   // "Show championship on TV": land on the bracket as soon as it exists
+        const j = playlist.findIndex((s) => s.key.startsWith("bracket:"));
+        if (j >= 0) { idx = j; jumpUntil = 0; keep = false; }
+      }
       renderHeader();
-      showScene(false, at >= 0 && !wasEmpty);
+      showScene(false, keep);
       updateTicker();
     }
 
@@ -1258,10 +1669,20 @@
     function updateTicker() {
       const items = [];
       const nm = (tm) => (tm && tm.name) || "Team";
+      if (!tvChampMode) {
       games.filter((g) => statusOf(g) === "live").sort(byOrder).forEach((g) => {
         const s = scoreOf(g);
         items.push({ tag: "LIVE", cls: "bg-optic text-court-900", text: catLabel(g.category) + " R" + (g.round || 0) + " · " + nm(g.team1) + " " + (Number(s.team1Score) || 0) + " – " + (Number(s.team2Score) || 0) + " " + nm(g.team2) });
       });
+      }
+      champInfo().forEach(({ c, br }) => {
+        if (!tvChampMode || !br.unlocked) return;
+        br.matches.filter((m) => m.live).forEach((m) => {
+          items.push({ tag: "LIVE", cls: "bg-optic text-court-900", text: catLabel(c.key) + " " + m.label + " · " + nm(m.t1) + " " + m.s1 + " – " + m.s2 + " " + nm(m.t2) });
+        });
+        if (br.champion) items.push({ tag: "CHAMPIONS", cls: "bg-optic text-court-900", text: catLabel(c.key) + " · " + br.champion.name });
+      });
+      if (!tvChampMode) {
       games.filter((g) => statusOf(g) === "completed").sort((a, b) => finishedAt(b) - finishedAt(a)).slice(0, 6).forEach((g) => {
         const s = scoreOf(g);
         items.push({ tag: "FINAL", cls: "bg-emerald-400/25 text-emerald-200", text: catLabel(g.category) + " R" + (g.round || 0) + " · " + nm(g.team1) + " " + (Number(s.team1Score) || 0) + " – " + (Number(s.team2Score) || 0) + " " + nm(g.team2) });
@@ -1269,6 +1690,7 @@
       games.filter((g) => statusOf(g) === "scheduled").sort(byRound).slice(0, 4).forEach((g, i) => {
         items.push({ tag: i === 0 ? "NEXT" : "LATER", cls: "bg-white/15 text-white/80", text: catLabel(g.category) + " R" + (g.round || 0) + " · " + nm(g.team1) + " vs " + nm(g.team2) });
       });
+      }
       const sig = items.map((x) => x.tag + x.text).join("|");
       if (sig === lastTicker) return;      // don't restart the scroll when nothing changed
       lastTicker = sig;

@@ -1279,9 +1279,12 @@
     }
 
     // The four matches of one category, worked out from its standings and the saved championship records.
+        // The championship only opens once every game of EVERY category is completed (none still being played).
+    let chAllDone = false;
+    const allCatsDone = (cats) => cats.length > 0 && cats.every((x) => x.done === x.total && x.live === 0);
     function chBracket(c, po) {
       po = po || {};
-      const unlocked = c.total > 0 && c.done === c.total && c.live === 0 && c.rows.length >= 4;
+      const unlocked = c.total > 0 && c.done === c.total && c.live === 0 && c.rows.length >= 4 && chAllDone;   // chAllDone: every game of every category
       const top = c.rows.slice(0, 4);
       const mk = (id, stage, label, t1, t2, seeds, ph) => {
         const known = Boolean(t1 && t2);
@@ -1292,11 +1295,29 @@
         return { id, stage, label, t1, t2, seeds, ph, known, m, stale, done, s1, s2,
           w: done ? (s1 > s2 ? t1 : t2) : null, l: done ? (s1 > s2 ? t2 : t1) : null };
       };
-      const sf1 = mk("sf1", "Semi-finals", "Semi-final 1", top[0], top[3], [1, 4], ["1st place", "4th place"]);
-      const sf2 = mk("sf2", "Semi-finals", "Semi-final 2", top[1], top[2], [2, 3], ["2nd place", "3rd place"]);
-      const third = mk("third", "Finals", "Third-place match", sf1.l, sf2.l, null, ["Loser of Semi-final 1", "Loser of Semi-final 2"]);
-      const fin = mk("final", "Championship", "Championship match", sf1.w, sf2.w, null, ["Winner of Semi-final 1", "Winner of Semi-final 2"]);
-      return { unlocked, matches: [sf1, sf2, third, fin], champion: fin.w, runnerUp: fin.l, thirdPlace: third.w };
+      // The admin picks the format before the championship starts (playoffs/<tid>/<category>/format):
+      //   "final"  = championship only (1st vs 2nd)
+      //   "finals" = finals + championship (3rd vs 4th for third place, 1st vs 2nd for the title)
+      //   "semis"  = semi-finals, finals and championship
+      // Older tournaments that already have matches but no saved format are treated as "semis".
+      const fmt = (po.format === "final" || po.format === "finals" || po.format === "semis") ? po.format
+        : ((po.sf1 || po.sf2 || po.third || po.final) ? "semis" : "");
+      let matches, champion, runnerUp, thirdPlace = null;
+      if (fmt === "final") {
+        const fin = mk("final", "Championship", "Championship match", top[0], top[1], [1, 2], ["1st place", "2nd place"]);
+        matches = [fin]; champion = fin.w; runnerUp = fin.l;
+      } else if (fmt === "finals") {
+        const third = mk("third", "Finals", "Third-place match", top[2], top[3], [3, 4], ["3rd place", "4th place"]);
+        const fin = mk("final", "Championship", "Championship match", top[0], top[1], [1, 2], ["1st place", "2nd place"]);
+        matches = [third, fin]; champion = fin.w; runnerUp = fin.l; thirdPlace = third.w;
+      } else {
+        const sf1 = mk("sf1", "Semi-finals", "Semi-final 1", top[0], top[3], [1, 4], ["1st place", "4th place"]);
+        const sf2 = mk("sf2", "Semi-finals", "Semi-final 2", top[1], top[2], [2, 3], ["2nd place", "3rd place"]);
+        const third = mk("third", "Finals", "Third-place match", sf1.l, sf2.l, null, ["Loser of Semi-final 1", "Loser of Semi-final 2"]);
+        const fin = mk("final", "Championship", "Championship match", sf1.w, sf2.w, null, ["Winner of Semi-final 1", "Winner of Semi-final 2"]);
+        matches = [sf1, sf2, third, fin]; champion = fin.w; runnerUp = fin.l; thirdPlace = third.w;
+      }
+      return { unlocked, started: Boolean(fmt), open: unlocked && Boolean(fmt), format: fmt, matches, champion, runnerUp, thirdPlace };
     }
 
     // Starts, scores, finishes or reopens a match. The referee who starts it is the only one who can score it.
@@ -1472,10 +1493,10 @@
       left.append(h, meta);
       const badge = document.createElement("span");
       badge.className = "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold " +
-        (br.champion ? "bg-optic/15 text-optic" : br.unlocked ? "bg-sky-400/15 text-sky-200" : "bg-white/10 text-white/60");
+        (br.champion ? "bg-optic/15 text-optic" : br.open ? "bg-sky-400/15 text-sky-200" : br.unlocked ? "bg-amber-300/15 text-amber-200" : "bg-white/10 text-white/60");
       const bi = document.createElement("i");
-      bi.className = "fa-solid " + (br.champion ? "fa-crown" : br.unlocked ? "fa-bolt" : "fa-lock");
-      badge.append(bi, document.createTextNode(br.champion ? "Champions crowned" : br.unlocked ? "Championship open" : "Locked"));
+      bi.className = "fa-solid " + (br.champion ? "fa-crown" : br.open ? "fa-bolt" : br.unlocked ? "fa-hourglass-half" : "fa-lock");
+      badge.append(bi, document.createTextNode(br.champion ? "Champions crowned" : br.open ? "Championship open" : br.unlocked ? "Waiting for admin" : "Locked"));
       head.append(left, badge);
       card.appendChild(head);
 
@@ -1483,18 +1504,20 @@
       body.className = "border-t border-white/10 px-4 pb-5 pt-4 sm:px-5";
       card.appendChild(body);
 
-      if (!br.unlocked) {
+      if (!br.open) {
         const lock = document.createElement("div");
         lock.className = "rounded-xl border border-dashed border-white/15 bg-white/5 p-5 text-center";
         const ic = document.createElement("i");
         ic.className = "fa-solid fa-lock text-2xl text-white/35";
         const msg = document.createElement("p");
         msg.className = "mt-3 text-sm text-white/65";
-        msg.textContent = c.rows.length < 4
+        msg.textContent = br.unlocked
+          ? "All games are completed. The admin needs to choose the championship format and start it before it can be scored."
+          : c.rows.length < 4
           ? "The championship needs at least 4 teams, and this category has " + c.rows.length + "."
           : c.total === 0
             ? "No games were generated for this category yet."
-            : "The championship opens when every game in this category is completed (" + c.done + " of " + c.total + " so far)" +
+            : "The championship opens when every game in every category is completed (" + c.done + " of " + c.total + " done in this category)" +
               (c.live ? ", and " + c.live + (c.live === 1 ? " game is" : " games are") + " still live." : ".");
         lock.append(ic, msg);
         body.appendChild(lock);
@@ -1547,6 +1570,7 @@
         st.className = "mb-2 font-display text-sm font-bold uppercase tracking-widest text-white/60";
         st.textContent = stage;
         const ms = br.matches.filter((x) => x.stage === stage);
+        if (!ms.length) return;
         const grid = document.createElement("div");
         grid.className = "grid gap-3 " + (ms.length > 1 ? "xl:grid-cols-2" : "");
         ms.forEach((x) => grid.appendChild(matchCard(c, x, po)));
@@ -1572,6 +1596,7 @@
         return;
       }
       const cats = computeStandings(t, games, scores).filter((c) => c.rows.length);
+      chAllDone = allCatsDone(cats);
       if (!cats.length) {
         state.textContent = "This tournament has no teams yet.";
         state.classList.remove("hidden");

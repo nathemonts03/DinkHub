@@ -1465,9 +1465,9 @@
                 <div>
                   <h2
                     class="font-display text-xl font-bold tracking-tight">Championship</h2>
-                  <p class="text-sm text-white/50">Once every game of a
-                    category is completed, its top 4 teams play the
-                    semi-finals, the finals and the championship match.</p>
+                  <p class="text-sm text-white/50">Once every game in every
+                    category is completed, choose how many brackets its
+                    championship has, then start it. The top 4 teams play it.</p>
                 </div>
               </div>
 
@@ -1492,11 +1492,13 @@
 
               <p class="mt-6 text-xs leading-relaxed text-white/40">
                 <i class="fa-solid fa-circle-info mr-1"></i>
-                Seeding follows the standings: semi-final 1 is 1st vs 4th and
-                semi-final 2 is 2nd vs 3rd. The finals stage is the
-                third-place match (semi-final losers) and the championship
-                match is played by the semi-final winners. A match can't end
-                in a tie.
+                Seeding follows the standings. With semi-finals, semi-final 1
+                is 1st vs 4th and semi-final 2 is 2nd vs 3rd; the finals stage
+                is the third-place match (semi-final losers) and the
+                championship match is played by the semi-final winners.
+                Without semi-finals, the championship is 1st vs 2nd and the
+                finals stage is the third-place match, 3rd vs 4th. A match
+                can't end in a tie.
               </p>
             </section>
 
@@ -5016,10 +5018,21 @@
       renderChampionship();
     }
 
-    // Works out the four matches of one category from its standings and the saved playoff scores.
+    const CH_FORMATS = [
+      { key: "final", icon: "fa-trophy", title: "Championship only", desc: "1st plays 2nd in a single championship match, right away." },
+      { key: "finals", icon: "fa-medal", title: "Finals + Championship", desc: "Championship: 1st vs 2nd. Finals: the third-place match, 3rd vs 4th. No semi-finals." },
+      { key: "semis", icon: "fa-sitemap", title: "Semi-finals, Finals + Championship", desc: "Semi-finals (1st vs 4th, 2nd vs 3rd), then the third-place match and the championship." },
+    ];
+    const chFormatName = (k) => (CH_FORMATS.find((f) => f.key === k) || {}).title || "";
+    let chPick = {};   // "<tournamentId>|<category>" -> format picked but not started yet
+
+    // Works out the matches of one category from its standings and the saved playoff scores.
+        // The championship only opens once every game of EVERY category is completed (none still being played).
+    let chAllDone = false;
+    const allCatsDone = (cats) => cats.length > 0 && cats.every((x) => x.done === x.total && x.live === 0);
     function chBracket(c, po) {
       po = po || {};
-      const unlocked = c.total > 0 && c.done === c.total && c.live === 0 && c.rows.length >= 4;
+      const unlocked = c.total > 0 && c.done === c.total && c.live === 0 && c.rows.length >= 4 && chAllDone;   // chAllDone: every game of every category
       const top = c.rows.slice(0, 4);
       const mk = (id, stage, label, t1, t2, seeds, ph) => {
         const known = Boolean(t1 && t2);
@@ -5030,11 +5043,29 @@
         return { id, stage, label, t1, t2, seeds, ph, known, m, stale, done, s1, s2,
           w: done ? (s1 > s2 ? t1 : t2) : null, l: done ? (s1 > s2 ? t2 : t1) : null };
       };
-      const sf1 = mk("sf1", "Semi-finals", "Semi-final 1", top[0], top[3], [1, 4], ["1st place", "4th place"]);
-      const sf2 = mk("sf2", "Semi-finals", "Semi-final 2", top[1], top[2], [2, 3], ["2nd place", "3rd place"]);
-      const third = mk("third", "Finals", "Third-place match", sf1.l, sf2.l, null, ["Loser of Semi-final 1", "Loser of Semi-final 2"]);
-      const fin = mk("final", "Championship", "Championship match", sf1.w, sf2.w, null, ["Winner of Semi-final 1", "Winner of Semi-final 2"]);
-      return { unlocked, matches: [sf1, sf2, third, fin], champion: fin.w, runnerUp: fin.l, thirdPlace: third.w };
+      // The admin picks the format before the championship starts (playoffs/<tid>/<category>/format):
+      //   "final"  = championship only (1st vs 2nd)
+      //   "finals" = finals + championship (3rd vs 4th for third place, 1st vs 2nd for the title)
+      //   "semis"  = semi-finals, finals and championship
+      // Older tournaments that already have matches but no saved format are treated as "semis".
+      const fmt = (po.format === "final" || po.format === "finals" || po.format === "semis") ? po.format
+        : ((po.sf1 || po.sf2 || po.third || po.final) ? "semis" : "");
+      let matches, champion, runnerUp, thirdPlace = null;
+      if (fmt === "final") {
+        const fin = mk("final", "Championship", "Championship match", top[0], top[1], [1, 2], ["1st place", "2nd place"]);
+        matches = [fin]; champion = fin.w; runnerUp = fin.l;
+      } else if (fmt === "finals") {
+        const third = mk("third", "Finals", "Third-place match", top[2], top[3], [3, 4], ["3rd place", "4th place"]);
+        const fin = mk("final", "Championship", "Championship match", top[0], top[1], [1, 2], ["1st place", "2nd place"]);
+        matches = [third, fin]; champion = fin.w; runnerUp = fin.l; thirdPlace = third.w;
+      } else {
+        const sf1 = mk("sf1", "Semi-finals", "Semi-final 1", top[0], top[3], [1, 4], ["1st place", "4th place"]);
+        const sf2 = mk("sf2", "Semi-finals", "Semi-final 2", top[1], top[2], [2, 3], ["2nd place", "3rd place"]);
+        const third = mk("third", "Finals", "Third-place match", sf1.l, sf2.l, null, ["Loser of Semi-final 1", "Loser of Semi-final 2"]);
+        const fin = mk("final", "Championship", "Championship match", sf1.w, sf2.w, null, ["Winner of Semi-final 1", "Winner of Semi-final 2"]);
+        matches = [sf1, sf2, third, fin]; champion = fin.w; runnerUp = fin.l; thirdPlace = third.w;
+      }
+      return { unlocked, started: Boolean(fmt), open: unlocked && Boolean(fmt), format: fmt, matches, champion, runnerUp, thirdPlace };
     }
 
     // The admin can only correct the score of a match a referee has already completed.
@@ -5108,6 +5139,101 @@
       return row;
     }
 
+    async function chSetFormat(c, fmt) {
+      const t = chTournaments.find((x) => x.id === chTid);
+      await update(ref(db), { ["playoffs/" + chTid + "/" + c.key + "/format"]: fmt });
+      logAction("update", "tournament", (t && t.name || "Untitled") + " \u00b7 " + (CATEGORY_LABELS[c.key] || c.key) +
+        (fmt ? " championship started: " + chFormatName(fmt) : " championship format reset"));
+    }
+
+    // Shown once a category's games are all completed and the admin hasn't started its championship yet.
+    function chFormatChooser(c) {
+      const pickKey = chTid + "|" + c.key;
+      const box = document.createElement("div");
+      const q = document.createElement("p");
+      q.className = "font-display text-base font-bold tracking-tight";
+      q.textContent = "How many brackets should this championship have?";
+      const sub = document.createElement("p");
+      sub.className = "mt-1 text-xs text-white/50";
+      sub.textContent = "Every game in every category is completed. Pick a format, then start the championship so referees can score it.";
+      const grid = document.createElement("div");
+      grid.className = "mt-4 grid gap-3 md:grid-cols-3";
+      grid.setAttribute("role", "group");
+      grid.setAttribute("aria-label", "Championship format");
+      CH_FORMATS.forEach((f) => {
+        const on = chPick[pickKey] === f.key;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.setAttribute("aria-pressed", String(on));
+        b.className = "flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-optic/40 " +
+          (on ? "border-optic bg-optic/10" : "border-white/10 bg-court-800/50 hover:border-white/30");
+        const ic = document.createElement("i");
+        ic.className = "fa-solid " + f.icon + " text-lg " + (on ? "text-optic" : "text-white/50");
+        const tt = document.createElement("span");
+        tt.className = "font-display text-sm font-bold tracking-tight " + (on ? "text-optic" : "text-white");
+        tt.textContent = f.title;
+        const ds = document.createElement("span");
+        ds.className = "text-xs leading-relaxed text-white/55";
+        ds.textContent = f.desc;
+        b.append(ic, tt, ds);
+        b.addEventListener("click", () => { chPick[pickKey] = f.key; renderChampionship(); });
+        grid.appendChild(b);
+      });
+      const start = document.createElement("button");
+      start.type = "button";
+      start.disabled = !chPick[pickKey];
+      start.className = "mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-optic px-5 py-3 font-display text-sm font-bold text-court-900 transition hover:bg-optic-dark focus:outline-none focus:ring-2 focus:ring-optic/50 disabled:cursor-not-allowed disabled:opacity-40";
+      start.innerHTML = '<i class="fa-solid fa-flag-checkered text-xs"></i><span>Start championship</span>';
+      start.addEventListener("click", async () => {
+        const fmt = chPick[pickKey];
+        if (!fmt) return;
+        start.disabled = true;
+        try {
+          await chSetFormat(c, fmt);
+          delete chPick[pickKey];
+          showToast("Championship started.");
+        } catch (err) {
+          start.disabled = false;
+          showToast(isPermissionError(err) ? "Permission denied. Check your database rule for playoffs." : "Couldn't start the championship.");
+        }
+      });
+      box.append(q, sub, grid, start);
+      return box;
+    }
+
+    // Format line above a started bracket. It can be changed until the first match has been played.
+    function chFormatBar(c, br, po) {
+      const bar = document.createElement("div");
+      bar.className = "mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-court-900/50 px-4 py-2.5 text-sm";
+      const l = document.createElement("span");
+      l.className = "text-white/60";
+      l.append(document.createTextNode("Format: "));
+      const strong = document.createElement("strong");
+      strong.className = "font-semibold text-white";
+      strong.textContent = chFormatName(br.format);
+      l.appendChild(strong);
+      bar.appendChild(l);
+      const played = Object.keys(po || {}).some((k) => k !== "format");
+      if (played) {
+        const n = document.createElement("span");
+        n.className = "text-xs text-white/40";
+        n.textContent = "Locked once a match has started";
+        bar.appendChild(n);
+      } else {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-white transition hover:border-optic/50 hover:text-optic focus:outline-none focus:ring-2 focus:ring-optic/30";
+        b.textContent = "Change format";
+        b.addEventListener("click", async () => {
+          b.disabled = true;
+          try { await chSetFormat(c, null); }
+          catch (err) { b.disabled = false; showToast(isPermissionError(err) ? "Permission denied. Check your database rule for playoffs." : "Couldn't change the format."); }
+        });
+        bar.appendChild(b);
+      }
+      return bar;
+    }
+
     function chMatchCard(c, mt, po) {
       const card = document.createElement("div");
       card.className = "rounded-2xl border p-4 " + (mt.done ? "border-emerald-400/25 bg-court-800/60" : mt.known ? "border-optic/30 bg-court-800/60" : "border-white/10 bg-court-800/30");
@@ -5176,9 +5302,9 @@
       left.append(h, meta);
       const badge = document.createElement("span");
       badge.className = "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold " +
-        (br.champion ? "bg-optic/15 text-optic" : br.unlocked ? "bg-sky-400/15 text-sky-200" : "bg-white/10 text-white/60");
-      badge.innerHTML = '<i class="fa-solid ' + (br.champion ? "fa-crown" : br.unlocked ? "fa-bolt" : "fa-lock") + '"></i>';
-      badge.appendChild(document.createTextNode(br.champion ? "Champions crowned" : br.unlocked ? "Championship open" : "Locked"));
+        (br.champion ? "bg-optic/15 text-optic" : br.open ? "bg-sky-400/15 text-sky-200" : br.unlocked ? "bg-amber-300/15 text-amber-200" : "bg-white/10 text-white/60");
+      badge.innerHTML = '<i class="fa-solid ' + (br.champion ? "fa-crown" : br.open ? "fa-bolt" : br.unlocked ? "fa-sliders" : "fa-lock") + '"></i>';
+      badge.appendChild(document.createTextNode(br.champion ? "Champions crowned" : br.open ? "Championship open" : br.unlocked ? "Choose a format" : "Locked"));
       head.append(left, badge);
       card.appendChild(head);
 
@@ -5198,12 +5324,19 @@
           ? "The championship needs at least 4 teams, and this category has " + c.rows.length + "."
           : c.total === 0
             ? "No games were generated for this category yet."
-            : "The championship opens when every game in this category is completed (" + c.done + " of " + c.total + " so far)" +
+            : "The championship opens when every game in every category is completed (" + c.done + " of " + c.total + " done in this category)" +
               (c.live ? ", and " + c.live + (c.live === 1 ? " game is" : " games are") + " still live." : ".");
         lock.append(ic, msg);
         body.appendChild(lock);
         return card;
       }
+
+      // Games are done: the admin chooses the format and starts the championship before anything can be scored.
+      if (!br.started) {
+        body.appendChild(chFormatChooser(c));
+        return card;
+      }
+      body.appendChild(chFormatBar(c, br, po));
 
       if (br.champion) {
         const ban = document.createElement("div");
@@ -5250,6 +5383,7 @@
         st.textContent = stage;
         const grid = document.createElement("div");
         const ms = br.matches.filter((m) => m.stage === stage);
+        if (!ms.length) return;
         grid.className = "grid gap-3 " + (ms.length > 1 ? "md:grid-cols-2" : "");
         ms.forEach((m) => grid.appendChild(chMatchCard(c, m, po)));
         sec.append(st, grid);
@@ -5270,6 +5404,7 @@
         return;
       }
       const cats = computeStandings(t, chGames, chScores);
+      chAllDone = allCatsDone(cats);
       if (chCat !== "all" && !cats.some((c) => c.key === chCat)) chCat = "all";
       if (cats.length) {
         [["all", "All categories"], ...cats.map((c) => [c.key, CATEGORY_LABELS[c.key] || c.key])].forEach(([val, label]) => {
