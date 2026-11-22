@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DinkHub | Login</title>
     <meta name="theme-color" content="#0b2a24" />
-    <link rel="icon" type="image/png" sizes="32x32"
-      href="icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
     <script src="pwa.js"></script>
@@ -562,19 +561,14 @@
       @keyframes pwaPop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
       @media (prefers-reduced-motion:reduce){#pwaInstall .pwa-card{animation:none}}
     </style>
-    <div id="pwaInstall" role="dialog" aria-modal="true"
-      aria-labelledby="pwaTitle" aria-describedby="pwaDesc">
+    <div id="pwaInstall" role="dialog" aria-modal="true" aria-labelledby="pwaTitle" aria-describedby="pwaDesc">
       <div class="pwa-card">
         <div class="pwa-head">
-          <img src="icons/icon-192.png" alt />
+          <img src="icons/icon-192.png" alt="" />
           <h2 id="pwaTitle">Install the DinkHub app</h2>
         </div>
-        <p id="pwaDesc">Add DinkHub to your device for faster access, a
-          full-screen experience and quick launch from your home screen.</p>
-        <div class="pwa-steps" id="pwaIosSteps">
-          On iPhone/iPad: tap the <strong>Share</strong> button in Safari, then
-          choose <strong>Add to Home Screen</strong>.
-        </div>
+        <p id="pwaDesc">Add DinkHub to your device for faster access, a full-screen experience and quick launch from your home screen.</p>
+        <div class="pwa-steps" id="pwaSteps"></div>
         <div class="pwa-row">
           <button type="button" class="pwa-no" id="pwaLater">Not now</button>
           <button type="button" class="pwa-yes" id="pwaYes">Install</button>
@@ -584,24 +578,32 @@
     <script>
     (function () {
       var KEY = "dinkhub_pwa_dismissed_at";
-      var SNOOZE_MS = 7 * 24 * 60 * 60 * 1000; // ask again after 7 days
+      var SNOOZE_MS = 24 * 60 * 60 * 1000; // ask again after 1 day
       var modal = document.getElementById("pwaInstall");
       var yes = document.getElementById("pwaYes");
       var later = document.getElementById("pwaLater");
-      var iosSteps = document.getElementById("pwaIosSteps");
+      var steps = document.getElementById("pwaSteps");
       var deferred = null;
       var opened = false;
+      var ua = navigator.userAgent || "";
 
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", function () {
-          navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function () {});
+          navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(function (err) {
+            console.warn("[DinkHub PWA] service worker failed:", err);
+          });
         });
       }
 
       var installed = !!(window.DinkPWA && DinkPWA.isInstalled());
-      var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      var ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      var android = /android/i.test(ua);
+      var inAppBrowser = /FBAN|FBAV|Instagram|Line\/|Messenger|MicroMessenger|TikTok|Snapchat/i.test(ua);
+      var force = /[?&]pwa=1\b/.test(location.search); // ?pwa=1 ignores the "Not now" snooze (for testing)
+
       var snoozed = function () {
-        try { var t = parseInt(localStorage.getItem(KEY) || "0", 10); return t && Date.now() - t < SNOOZE_MS; }
+        if (force) return false;
+        try { var t = parseInt(localStorage.getItem(KEY) || "0", 10); return !!t && Date.now() - t < SNOOZE_MS; }
         catch (_) { return false; }
       };
       var close = function (remember) {
@@ -609,30 +611,48 @@
         document.documentElement.style.overflow = "";
         if (remember) { try { localStorage.setItem(KEY, String(Date.now())); } catch (_) {} }
       };
+      var manualText = function () {
+        if (inAppBrowser) return "This in-app browser can\u2019t install apps. Tap the <strong>\u22EF / \u22EE menu</strong> and choose <strong>Open in browser</strong> (Chrome or Safari), then try again.";
+        if (ios) return "On iPhone/iPad: open this page in <strong>Safari</strong>, tap the <strong>Share</strong> button, then choose <strong>Add to Home Screen</strong>.";
+        if (android) return "Tap the browser\u2019s <strong>\u22EE menu</strong>, then choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.";
+        return "In Chrome or Edge, click the <strong>install icon</strong> at the right end of the address bar, or open the <strong>\u22EE menu \u2192 Install DinkHub</strong>.";
+      };
+      var showManual = function () { steps.innerHTML = manualText(); steps.classList.add("show"); };
+
       var open = function () {
         if (opened || installed || snoozed()) return;
         opened = true;
-        if (!deferred && ios) { iosSteps.classList.add("show"); yes.textContent = "Got it"; }
-        // Wait a moment so the login screen can finish its entrance animation first.
-        setTimeout(function () {
-          modal.classList.add("open");
-          document.documentElement.style.overflow = "hidden";
-          yes.focus();
-        }, 1200);
+        modal.classList.add("open");
+        document.documentElement.style.overflow = "hidden";
+        if (!deferred) { if (ios || inAppBrowser) { showManual(); yes.textContent = "Got it"; } }
+        yes.focus();
       };
 
-      window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; open(); });
-      window.addEventListener("appinstalled", function () { close(false); });
-      // iOS Safari never fires beforeinstallprompt, so show the Add to Home Screen steps instead.
-      if (ios && !installed) open();
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferred = e;
+        steps.classList.remove("show");
+        yes.textContent = "Install";
+        open();
+      });
+      window.addEventListener("appinstalled", function () { deferred = null; close(false); });
+
+      // Always show the pop-up once the login screen has settled, even if the browser
+      // never fires its install event (then the button explains how to install by hand).
+      if (!installed) setTimeout(open, 1500);
 
       yes.addEventListener("click", async function () {
         if (deferred) {
-          deferred.prompt();
-          try { await deferred.userChoice; } catch (_) {}
+          var d = deferred;
           deferred = null;
+          try { d.prompt(); await d.userChoice; } catch (_) {}
           close(true);
-        } else close(true); // iOS: user read the steps
+        } else if (ios || inAppBrowser || steps.classList.contains("show")) {
+          close(true);
+        } else {
+          showManual();           // no automatic prompt available: show the manual steps
+          yes.textContent = "Got it";
+        }
       });
       later.addEventListener("click", function () { close(true); });
       modal.addEventListener("click", function (e) { if (e.target === modal) close(true); });
