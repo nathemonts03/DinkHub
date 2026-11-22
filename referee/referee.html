@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <title>DinkHub | Referee</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            court: { 900: "#0b2a24", 800: "#0f3a32", 700: "#14493f", 600: "#1b5e51" },
+            optic: { DEFAULT: "#d7ff3f", dark: "#b9e01f" },
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', "sans-serif"],
+            body: ['"DM Sans"', "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet" />
+    <link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style>
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    .fade-up { animation: fadeUp .6s cubic-bezier(.22, 1, .36, 1) backwards; animation-delay: var(--d, 0ms); }
+    .page-in { animation: fadeIn .7s ease-out both; }
+    .modal-in { animation: fadeIn .25s ease-out; }
+    .modal-out { animation: fadeOut .2s ease-in forwards; }
+    .live-dot { animation: livePulse 1.4s ease-in-out infinite; }
+    @keyframes bounceBall { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-14px) rotate(12deg); } }
+    .ball { animation: bounceBall 1.6s ease-in-out infinite; }
+    /* faint pickleball-court grid behind the whole page */
+    .court-bg { background-image: linear-gradient(rgba(215,255,63,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(215,255,63,.04) 1px, transparent 1px); background-size: 44px 44px; }
+    /* net-mesh strip */
+    .net { background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.22) 0 2px, transparent 2px 9px), linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.1)); }
+    body { transition: opacity .45s ease; }
+    body.fade-out { opacity: 0; }
+    /* hide native number spinners; we use our own +/- buttons */
+    input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+    /* ---- motion: only opacity + transform are animated, so everything stays on the GPU at 60fps ---- */
+    html { scroll-behavior: smooth; }
+    @keyframes enterIn { from { opacity: 0; transform: translateY(18px) scale(.985); } to { opacity: 1; transform: none; } }
+    .enter { animation: enterIn .5s cubic-bezier(.22, 1, .36, 1) backwards; animation-delay: calc(var(--i, 0) * 40ms); will-change: transform, opacity; }
+    @keyframes scorePop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+    .score-pop { animation: scorePop .5s cubic-bezier(.34, 1.56, .64, 1); }
+    /* switching sections: fade + slide out, swap, fade + slide back in */
+    .fx { transition: opacity .2s ease, transform .2s cubic-bezier(.4, 0, .2, 1); }
+    .fx.is-out { opacity: 0; transform: translateY(10px); }
+    /* modals fade and scale away as well as in */
+    @keyframes popOut { to { opacity: 0; transform: translateY(10px) scale(.97); } }
+    .modal-out > * { animation: popOut .2s ease-in forwards !important; }
+    /* press feedback + gentle card lift */
+    button:not(:disabled):active { transform: scale(.97); }
+    #list li, #list [data-card] { transition: transform .25s cubic-bezier(.22, 1, .36, 1); }
+    #list li:hover, #list [data-card]:hover { transform: translateY(-2px); }
+    @media (prefers-reduced-motion: reduce) {
+      .fade-up, .page-in, .modal-in, .modal-out, .live-dot, .ball, .enter, .score-pop { animation: none !important; }
+      .modal-out > * { animation: none !important; }
+      .fx { transition: none; }
+      html { scroll-behavior: auto; }
+      body { transition: none; }
+    }
+  </style>
+  </head>
+
+  <body class="court-bg font-body bg-court-900 text-white min-h-screen">
+
+    <!-- Scroll progress -->
+    <div id="scrollBar" aria-hidden="true"
+      class="pointer-events-none fixed left-0 top-0 z-[45] h-0.5 w-full origin-left bg-optic"
+      style="transform:scaleX(0)"></div>
+
+    <!-- Shown while Firebase checks who is signed in -->
+    <div id="loader"
+      class="fixed inset-0 z-[70] grid place-items-center bg-court-900 transition-opacity duration-500">
+      <div class="flex flex-col items-center"><svg class="ball h-16 w-16"
+          viewBox="0 0 100 100" aria-hidden="true"><circle cx="50"
+            cy="50" r="46" fill="#d7ff3f" /><g fill="#0b2a24"
+            fill-opacity=".85"><circle cx="50" cy="22"
+              r="5" /><circle cx="28" cy="34" r="5" /><circle
+              cx="72" cy="34" r="5" /><circle cx="50" cy="48"
+              r="5" /><circle cx="24" cy="58" r="5" /><circle
+              cx="76" cy="58" r="5" /><circle cx="38" cy="72"
+              r="5" /><circle cx="62" cy="72" r="5" /></g></svg><p
+          class="mt-4 text-sm text-white/60">Warming up the
+          court...</p></div>
+    </div>
+
+    <!-- Finish game confirmation -->
+    <div id="fmModal"
+      class="modal-in hidden fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-sm"
+      role="alertdialog" aria-modal="true" aria-labelledby="fmTitle">
+      <div
+        class="fade-up w-full max-w-sm rounded-2xl border border-white/10 bg-court-800 p-6 text-center shadow-2xl">
+        <div
+          class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-optic/10 text-optic"><i
+            class="fa-solid fa-flag-checkered"></i></div>
+        <h2 id="fmTitle"
+          class="mt-4 font-display text-2xl font-extrabold tracking-tight">Confirm
+          final score</h2>
+        <p id="fmGame"
+          class="mt-1 text-xs font-semibold uppercase tracking-widest text-white/45"></p>
+        <div class="mt-4 space-y-2 rounded-xl bg-white/5 p-4 text-left">
+          <div class="flex items-center justify-between gap-3"><span
+              id="fmTeam1"
+              class="min-w-0 break-words font-display font-bold"></span><span
+              id="fmScore1"
+              class="font-display text-2xl font-extrabold"></span></div>
+          <div class="flex items-center justify-between gap-3"><span
+              id="fmTeam2"
+              class="min-w-0 break-words font-display font-bold"></span><span
+              id="fmScore2"
+              class="font-display text-2xl font-extrabold"></span></div>
+        </div>
+        <div class="mt-4 space-y-2 text-left">
+          <p
+            class="text-xs font-semibold uppercase tracking-widest text-white/45">Team
+            representatives</p>
+          <label
+            class="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:border-optic/40">
+            <input id="fmConf1" type="checkbox"
+              class="mt-0.5 h-4 w-4 shrink-0 accent-optic" />
+            <span class="text-sm text-white/80"><span
+                id="fmConfName1"
+                class="font-semibold text-white"></span>
+              representative confirms the score is correct.</span>
+          </label>
+          <label
+            class="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:border-optic/40">
+            <input id="fmConf2" type="checkbox"
+              class="mt-0.5 h-4 w-4 shrink-0 accent-optic" />
+            <span class="text-sm text-white/80"><span
+                id="fmConfName2"
+                class="font-semibold text-white"></span>
+              representative confirms the score is correct.</span>
+          </label>
+          <p class="text-xs text-white/50">Both representatives must
+            confirm before the game can be finished.</p>
+        </div>
+        <p class="mt-3 text-xs text-white/50">You can reopen the game
+          later if the score needs a correction.</p>
+        <div class="mt-5 flex gap-3">
+          <button id="fmCancel" type="button"
+            class="flex-1 rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-white/20">Cancel</button>
+          <button id="fmGo" type="button"
+            class="flex-1 rounded-xl bg-optic px-4 py-3 font-display text-sm font-bold text-court-900 transition hover:bg-optic-dark focus:outline-none focus:ring-2 focus:ring-optic/50 disabled:cursor-not-allowed disabled:opacity-60">Finish</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"
+      class="pointer-events-none fixed bottom-6 left-1/2 z-[65] w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 translate-y-2 rounded-xl border border-optic/40 bg-court-800 px-4 py-3 text-sm text-optic opacity-0 shadow-xl transition duration-300"></div>
+
+    <div id="page" class="hidden min-h-screen">
+
+      <!-- Top bar -->
+      <header
+        class="sticky top-0 z-30 border-b border-white/10 bg-court-800/90 backdrop-blur">
+        <div
+          class="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div class="flex items-center gap-3">
+            <svg class="h-9 w-9" viewBox="0 0 100 100"
+              aria-hidden="true"><circle cx="50" cy="50" r="46"
+                fill="#d7ff3f" /><g fill="#0b2a24"
+                fill-opacity=".85"><circle cx="50" cy="22"
+                  r="5" /><circle cx="28" cy="34"
+                  r="5" /><circle cx="72" cy="34"
+                  r="5" /><circle cx="50" cy="48"
+                  r="5" /><circle cx="24" cy="58"
+                  r="5" /><circle cx="76" cy="58"
+                  r="5" /><circle cx="38" cy="72"
+                  r="5" /><circle cx="62" cy="72"
+                  r="5" /></g></svg>
+            <div class="leading-tight">
+              <span
+                class="block font-display text-xl font-extrabold tracking-tight">Dink<span
+                  class="text-optic">Hub</span></span>
+              <span
+                class="block text-[10px] font-semibold uppercase tracking-widest text-optic/80">Referee</span>
+            </div>
+          </div>
+          <button id="sbOpen" type="button"
+            aria-label="Open tournaments menu"
+            class="inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold text-white/85 transition hover:border-optic/50 hover:text-optic focus:outline-none focus:ring-2 focus:ring-optic/30 lg:hidden"><i
+              class="fa-solid fa-bars text-optic"></i><span
+              class="hidden sm:inline">Tournaments</span></button>
+        </div>
+      </header>
+
+      <div class="lg:flex">
+        <!-- Sidebar: tournaments assigned to this referee -->
+        <aside id="sidebar" aria-label="My tournaments"
+          class="fixed bottom-3 left-3 top-3 z-40 flex w-72 max-w-[calc(100vw-1.5rem)] -translate-x-[115%] flex-col rounded-2xl border border-white/10 bg-court-800/95 p-4 shadow-2xl shadow-black/40 backdrop-blur transition-transform duration-300 lg:sticky lg:inset-auto lg:top-[77px] lg:z-20 lg:m-4 lg:h-[calc(100vh-93px)] lg:shrink-0 lg:translate-x-0 lg:self-start">
+          <div class="flex items-center justify-between gap-2">
+            <p
+              class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/60"><i
+                class="fa-solid fa-trophy text-optic"></i>My
+              tournaments</p>
+            <button id="sbClose" type="button"
+              aria-label="Close menu"
+              class="grid h-8 w-8 place-items-center rounded-lg text-white/60 transition hover:bg-white/5 hover:text-white lg:hidden"><i
+                class="fa-solid fa-xmark"></i></button>
+          </div>
+          <p id="tHint" class="mt-1 text-xs text-white/40">Assigned to
+            you, with confirmed games.</p>
+          <div class="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+            <ul id="tNav" class="space-y-2"></ul>
+          </div>
+          <div class="mt-4 border-t border-white/10 pt-4">
+            <div class="mb-3 flex items-center gap-3">
+              <div id="avatar"
+                class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-optic/15 font-display font-bold text-optic">R</div>
+              <div class="min-w-0 leading-tight">
+                <p id="meName"
+                  class="truncate text-sm font-medium text-white/90"></p>
+                <p id="meEmail"
+                  class="truncate text-xs text-white/45"></p>
+              </div>
+            </div>
+            <button id="logoutBtn" type="button"
+              class="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition duration-300 hover:border-red-400/50 hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-red-400/30 disabled:cursor-not-allowed disabled:opacity-60">
+              <svg id="logoutSpinner"
+                class="hidden h-4 w-4 animate-spin"
+                viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10"
+                  stroke="currentColor" stroke-width="4"
+                  class="opacity-25" />
+                <path d="M4 12a8 8 0 018-8"
+                  stroke="currentColor" stroke-width="4"
+                  stroke-linecap="round" />
+              </svg>
+              <i id="logoutIcon"
+                class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+              <span id="logoutLabel">Log out</span>
+            </button>
+          </div>
+        </aside>
+        <div id="sbBackdrop"
+          class="fixed inset-0 z-[35] hidden bg-black/60 opacity-0 transition-opacity duration-300 lg:hidden"></div>
+
+        <main class="min-w-0 flex-1 px-4 py-8 sm:px-6 sm:py-10"><div
+            class="mx-auto max-w-4xl">
+            <section
+              class="fade-up relative overflow-hidden rounded-3xl border border-optic/20 bg-gradient-to-br from-court-700 to-court-800 p-6 sm:p-8">
+              <svg
+                class="pointer-events-none absolute -right-6 top-0 h-full w-2/3 opacity-20"
+                viewBox="0 0 400 220"
+                preserveAspectRatio="xMaxYMid slice"
+                aria-hidden="true">
+                <g fill="none" stroke="#d7ff3f"
+                  stroke-width="2"><rect x="20" y="20"
+                    width="360" height="180" rx="3" /><line
+                    x1="200" y1="20" x2="200" y2="200"
+                    stroke-width="4" /><line x1="110"
+                    y1="20" x2="110" y2="200" /><line
+                    x1="290" y1="20" x2="290"
+                    y2="200" /><line x1="20" y1="110"
+                    x2="110" y2="110" /><line x1="290"
+                    y1="110" x2="380" y2="110" /></g>
+              </svg>
+              <div
+                class="relative flex items-center justify-between gap-6">
+                <div>
+                  <p
+                    class="text-xs font-semibold uppercase tracking-widest text-optic">Referee
+                    station</p>
+                  <h1 id="hello"
+                    class="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Referee</h1>
+                  <p class="mt-2 max-w-md text-white/70">Pick
+                    your tournament, call the game and keep
+                    score. Both teams confirm the final
+                    score before it counts.</p>
+                </div>
+                <svg
+                  class="ball hidden h-24 w-24 shrink-0 drop-shadow-2xl sm:block"
+                  viewBox="0 0 100 100"
+                  aria-hidden="true"><circle cx="50" cy="50"
+                    r="46" fill="#d7ff3f" /><g
+                    fill="#0b2a24"
+                    fill-opacity=".85"><circle cx="50"
+                      cy="22" r="5" /><circle cx="28"
+                      cy="34" r="5" /><circle cx="72"
+                      cy="34" r="5" /><circle cx="50"
+                      cy="48" r="5" /><circle cx="24"
+                      cy="58" r="5" /><circle cx="76"
+                      cy="58" r="5" /><circle cx="38"
+                      cy="72" r="5" /><circle cx="62"
+                      cy="72" r="5" /></g></svg>
+              </div>
+              <div class="net relative mt-6 h-2 rounded-full"
+                aria-hidden="true"></div>
+            </section>
+
+            <!-- Selected tournament -->
+            <section
+              class="fade-up fx mt-6 rounded-2xl border border-optic/20 bg-court-800/80 p-5 shadow-lg sm:p-6"
+              style="--d:140ms">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p
+                    class="text-xs font-semibold uppercase tracking-widest text-optic/80">Selected
+                    tournament</p>
+                  <h2 id="tCurrent"
+                    class="mt-1 break-words font-display text-2xl font-extrabold tracking-tight">No
+                    tournament selected</h2>
+                </div>
+              </div>
+              <div id="tMeta"
+                class="mt-4 hidden flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/60"></div>
+            </section>
+
+            <!-- Games / Championship tabs -->
+            <div id="viewTabs" class="fade-up mt-6 hidden gap-2" role="group"
+              aria-label="Section">
+              <button id="tabGames" type="button"></button>
+              <button id="tabChamp" type="button"></button>
+            </div>
+
+            <!-- Games -->
+            <section id="gamesSection" class="fx mt-6 hidden">
+              <div class="grid grid-cols-3 gap-3">
+                <div
+                  class="rounded-2xl border border-white/10 bg-court-800/70 p-4">
+                  <p
+                    class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/50"><i
+                      class="fa-solid fa-table-tennis-paddle-ball text-optic"></i>Games</p>
+                  <p id="stTotal"
+                    class="mt-2 font-display text-3xl font-extrabold tabular-nums">0</p>
+                </div>
+                <div
+                  class="rounded-2xl border border-white/10 bg-court-800/70 p-4">
+                  <p
+                    class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/50"><i
+                      class="fa-solid fa-bolt text-optic"></i>Live
+                    <span
+                      class="live-dot h-1.5 w-1.5 rounded-full bg-optic"></span></p>
+                  <p id="stLive"
+                    class="mt-2 font-display text-3xl font-extrabold tabular-nums">0</p>
+                </div>
+                <div
+                  class="rounded-2xl border border-white/10 bg-court-800/70 p-4">
+                  <p
+                    class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/50"><i
+                      class="fa-solid fa-flag-checkered text-optic"></i>Final</p>
+                  <p id="stDone"
+                    class="mt-2 font-display text-3xl font-extrabold tabular-nums">0</p>
+                </div>
+              </div>
+
+              <div
+                class="mt-5 space-y-3 rounded-xl border border-white/10 bg-court-800/50 p-4">
+                <div class="relative">
+                  <label for="search" class="sr-only">Search
+                    team or player</label>
+                  <i
+                    class="fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-white/35"></i>
+                  <input id="search" type="search"
+                    autocomplete="off" spellcheck="false"
+                    placeholder="Search team or player name"
+                    class="w-full rounded-xl border border-white/10 bg-court-900 py-3 pl-11 pr-4 text-sm text-white placeholder-white/30 outline-none transition duration-300 hover:border-white/25 focus:border-optic focus:ring-4 focus:ring-optic/15" />
+                </div>
+                <div id="statusChips"
+                  class="flex flex-wrap gap-2" role="group"
+                  aria-label="Status"></div>
+                <div id="catChips" class="flex flex-wrap gap-2"
+                  role="group" aria-label="Category"></div>
+              </div>
+            </section>
+
+            <p id="state" class="fx mt-8 text-sm text-white/50">Loading
+              tournaments...</p>
+            <div id="list" class="fx mt-6 space-y-8"></div>
+          </div></main>
+      </div>
+    </div>
+
+    <script src="../firebase-config.js"></script>
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { getDatabase, ref, get, update, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
+    const { firebase: firebaseConfig, adminUid: ADMIN_UID } = window.APP_CONFIG;
+    const LOGIN_PAGE = "../index.html";
+    const REVALIDATE_MS = 2 * 60 * 1000; // re-check the account is still active this often
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const $ = (id) => document.getElementById(id);
+
+    const CATEGORY_LABELS = { mens: "Men's", womens: "Women's", mixed: "Mixed" };
+    const CAT_ORDER = ["mens", "womens", "mixed"];
+    const STATUS_LABELS = { scheduled: "Scheduled", live: "Live", completed: "Completed" };
+    const STATUS_STYLE = {
+      scheduled: "bg-white/10 text-white/70",
+      live: "bg-optic/15 text-optic",
+      completed: "bg-emerald-400/15 text-emerald-200",
+    };
+    const MAX_SCORE = 99;
+
+    // ---------- Motion helpers ----------
+    const REDUCED = Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    let enterAnim = false;       // play the staggered entrance on the next render
+    let animEnd = 0;             // live updates wait for the entrance to end, so it never restarts half-way
+    let deferTimer = null;
+    let swapTimer = null;
+    let sbAnimated = false;
+    const shownScores = new Map(); // "gameId|side" -> last score drawn, to pop the number when it changes
+    const statVals = {};
+
+    // Fade + rise a freshly built element in; the class is removed afterwards so the GPU layer is freed.
+    function enterEl(el, i) {
+      if (REDUCED) return;
+      el.style.setProperty("--i", String(Math.min(i, 12)));
+      el.classList.add("enter");
+      el.addEventListener("animationend", (e) => {
+        if (e.target !== el || e.animationName !== "enterIn") return;
+        el.classList.remove("enter");
+        el.style.removeProperty("--i");
+      });
+    }
+    function playEnter() {
+      if (REDUCED) return;
+      const list = $("list");
+      const groups = Array.from(list.children);
+      const cards = Array.from(list.querySelectorAll("li, [data-card]"));
+      groups.forEach((el, i) => enterEl(el, i));
+      cards.forEach((el, i) => enterEl(el, i));
+      animEnd = performance.now() + 450 + Math.min(Math.max(groups.length, cards.length), 12) * 40;
+    }
+
+    // Fade the given blocks out, run the change, then fade them back in (and play the entrance on the new content).
+    function fadeSwap(fn, targets) {
+      targets = (targets || [$("list"), $("state"), $("gamesSection"), $("tCurrent").closest("section")]).filter(Boolean);
+      if (REDUCED) { fn(); return; }
+      clearTimeout(swapTimer);
+      targets.forEach((el) => el.classList.add("is-out"));
+      swapTimer = setTimeout(() => {
+        enterAnim = true;
+        fn();
+        requestAnimationFrame(() => requestAnimationFrame(() => targets.forEach((el) => el.classList.remove("is-out"))));
+      }, 200);
+    }
+    function swapList() { fadeSwap(() => { renderPending = false; renderNow(); }, [$("list")]); }
+
+    // Numbers count up / down to their new value with a small pop.
+    function setStat(id, n) {
+      const el = $(id);
+      const from = id in statVals ? statVals[id] : 0;
+      statVals[id] = n;
+      el._tw = (el._tw || 0) + 1;
+      const my = el._tw;
+      if (REDUCED || from === n) { el.textContent = String(n); return; }
+      const t0 = performance.now();
+      const step = (now) => {
+        if (el._tw !== my) return;
+        const p = Math.min(1, (now - t0) / 450);
+        el.textContent = String(Math.round(from + (n - from) * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+      el.style.transformOrigin = "left center";
+      el.classList.remove("score-pop");
+      void el.offsetWidth;
+      el.classList.add("score-pop");
+    }
+
+    // Thin progress bar along the top of the page while scrolling (transform only).
+    const scrollBar = $("scrollBar");
+    let scrollTick = false;
+    window.addEventListener("scroll", () => {
+      if (scrollTick) return;
+      scrollTick = true;
+      requestAnimationFrame(() => {
+        const h = document.documentElement;
+        const max = h.scrollHeight - h.clientHeight;
+        scrollBar.style.transform = "scaleX(" + (max > 0 ? Math.min(1, h.scrollTop / max) : 0) + ")";
+        scrollTick = false;
+      });
+    }, { passive: true });
+
+    // Firebase may hand back arrays as objects; this always gives an array.
+    const toList = (v) => Array.isArray(v) ? v.filter((x) => x != null) : v && typeof v === "object" ? Object.values(v) : [];
+    const isPermissionError = (err) => Boolean(err) && (err.code === "PERMISSION_DENIED" || /permission[_ ]denied/i.test(String(err.message || "")));
+
+    // ---------- State ----------
+    let me = null;               // { uid, name, email }
+    let loggingOut = false;
+    let ready = false;
+    let tournaments = [];        // tournaments whose games are confirmed
+    let tid = "";                // selected tournament id
+    let games = [];              // games of the selected tournament
+    let scores = {};             // live scores: gameId -> {...}
+    let unsubScores = null;
+    let cat = "all", statusFilter = "all", query = "";
+    const drafts = new Map();    // gameId -> { t1, t2 } typed but not saved yet
+    let renderPending = false;
+    let view = "games";          // "games" | "championship"
+    let playoffs = {};           // championship matches: category -> match id -> record
+    let unsubPlayoffs = null;
+    let poError = "";
+
+    // ---------- Helpers ----------
+    let toastTimer = null;
+    function showToast(msg) {
+      const t = $("toast");
+      t.textContent = msg;
+      t.classList.remove("opacity-0", "translate-y-2");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.add("opacity-0", "translate-y-2"), 2800);
+    }
+
+    const goToLogin = () => {
+      document.body.classList.add("fade-out");
+      setTimeout(() => window.location.replace(LOGIN_PAGE), 450);
+    };
+
+    // End the session and tell the login page why.
+    async function denyAccess(message) {
+      if (loggingOut) return;
+      loggingOut = true;
+      try { sessionStorage.setItem("dinkhub_notice", message); } catch (_) {}
+      try { await signOut(auth); } catch (_) {}
+      goToLogin();
+    }
+
+    // ---------- Guard: only active referee accounts may be here ----------
+    async function loadProfile(uid) {
+      const snap = await get(ref(db, "accounts/" + uid));
+      return snap.exists() ? snap.val() : null;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (loggingOut) return;
+      if (!user) return goToLogin();
+      if (user.uid === ADMIN_UID) return goToLogin(); // the login page sends the admin to the dashboard
+
+      let profile = null;
+      try {
+        await user.getIdToken(true);
+        profile = await loadProfile(user.uid);
+      } catch (err) {
+        if (!isPermissionError(err)) {
+          // Brief network problem: don't throw the referee out, just try again shortly.
+          if (!ready) setTimeout(() => window.location.reload(), 4000);
+          return;
+        }
+      }
+      if (!profile || profile.role !== "referee" || profile.status !== "active") {
+        return denyAccess("Access denied. Your account is disabled or isn't a referee account.");
+      }
+      if (ready) return;
+      ready = true;
+
+      me = { uid: user.uid, name: profile.name || user.displayName || user.email || "Referee", email: user.email || "" };
+      $("meName").textContent = me.name;
+      $("meEmail").textContent = me.email;
+      $("avatar").textContent = (me.name.charAt(0) || "R").toUpperCase();
+      $("hello").textContent = "Hi, " + (me.name.split(" ")[0] || "Referee");
+
+      $("page").classList.remove("hidden");
+      $("page").classList.add("page-in");
+      const loader = $("loader");
+      loader.classList.add("opacity-0", "pointer-events-none");
+      setTimeout(() => loader.classList.add("hidden"), 500);
+
+      setInterval(revalidate, REVALIDATE_MS);
+      loadTournaments();
+    });
+
+    // Disabling an account takes effect here within a couple of minutes.
+    async function revalidate() {
+      if (!ready || loggingOut) return;
+      const user = auth.currentUser;
+      if (!user) return;
+      try {
+        await user.getIdToken(true);
+        const profile = await loadProfile(user.uid);
+        if (!profile || profile.role !== "referee" || profile.status !== "active") {
+          denyAccess("Your account has been disabled.");
+        }
+      } catch (err) {
+        if (isPermissionError(err)) denyAccess("Your account has been disabled.");
+        else if (err && err.code && err.code !== "auth/network-request-failed" && String(err.code).startsWith("auth/")) denyAccess("Your session has ended. Please sign in again.");
+      }
+    }
+
+    window.addEventListener("pageshow", (e) => { if (e.persisted) window.location.reload(); });
+
+    $("logoutBtn").addEventListener("click", async () => {
+      loggingOut = true;
+      $("logoutBtn").disabled = true;
+      $("logoutSpinner").classList.remove("hidden");
+      $("logoutIcon").classList.add("hidden");
+      $("logoutLabel").textContent = "Logging out...";
+      try {
+        await signOut(auth);
+        goToLogin();
+      } catch (_) {
+        loggingOut = false;
+        $("logoutBtn").disabled = false;
+        $("logoutSpinner").classList.add("hidden");
+        $("logoutIcon").classList.remove("hidden");
+        $("logoutLabel").textContent = "Log out";
+        showToast("Couldn't log out. Please try again.");
+      }
+    });
+
+    // ---------- Tournaments ----------
+    const todayStr = () => {
+      const d = new Date();
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    };
+    function formatDate(s) {
+      if (!s) return "";
+      const d = new Date(s + "T00:00:00");
+      return isNaN(d) ? s : d.toLocaleDateString([], { dateStyle: "medium" });
+    }
+
+    async function loadTournaments() {
+      const state = $("state");
+      try {
+        // Only the tournaments the admin assigned to this referee: refereeAssignments/<uid> lists their ids.
+        const aSnap = await get(ref(db, "refereeAssignments/" + me.uid));
+        const ids = aSnap.exists() ? Object.keys(aSnap.val() || {}) : [];
+        const loaded = await Promise.all(ids.map(async (id) => {
+          try {
+            const s = await get(ref(db, "tournaments/" + id));
+            return s.exists() ? { id, ...s.val() } : null;
+          } catch (_) { return null; } // removed from the tournament since: skip it
+        }));
+        const assigned = loaded.filter((v) => v && v.referees && v.referees[me.uid]);
+        const items = assigned.filter((v) => v.gamesConfirmed);
+        // Today and upcoming first (soonest first), then past ones (latest first).
+        const today = todayStr();
+        const upcoming = items.filter((t) => (t.date || "") >= today).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        const past = items.filter((t) => (t.date || "") < today).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        tournaments = [...upcoming, ...past];
+
+        renderSidebar();
+
+        if (!tournaments.length) {
+          state.textContent = assigned.length
+            ? "You're assigned to " + assigned.length + (assigned.length === 1 ? " tournament" : " tournaments") + ", but the games aren't confirmed yet."
+            : "No tournaments are assigned to you yet. Ask the admin to add you as a referee.";
+          return;
+        }
+        let last = "";
+        try { last = localStorage.getItem("dinkhub_ref_tid") || ""; } catch (_) {}
+        // Reopen the last one used, otherwise the first (today's / next) tournament.
+        selectTournament(last && tournaments.some((t) => t.id === last) ? last : tournaments[0].id);
+      } catch (err) {
+        state.textContent = isPermissionError(err)
+          ? "Permission denied. The database rules don't allow referees to read their assigned tournaments yet."
+          : "Couldn't load tournaments.";
+      }
+    }
+
+    // ---------- Sidebar ----------
+    const sidebar = $("sidebar"), sbBackdrop = $("sbBackdrop");
+    let sbTimer = null;
+    const openSidebar = () => {
+      clearTimeout(sbTimer);
+      sidebar.classList.remove("-translate-x-[115%]");
+      sbBackdrop.classList.remove("hidden");
+      void sbBackdrop.offsetWidth;
+      sbBackdrop.classList.remove("opacity-0");
+    };
+    const closeSidebar = () => {
+      sidebar.classList.add("-translate-x-[115%]");
+      sbBackdrop.classList.add("opacity-0");
+      clearTimeout(sbTimer);
+      sbTimer = setTimeout(() => sbBackdrop.classList.add("hidden"), 300);
+    };
+    $("sbOpen").addEventListener("click", openSidebar);
+    $("sbClose").addEventListener("click", closeSidebar);
+    sbBackdrop.addEventListener("click", closeSidebar);
+
+    function renderSidebar() {
+      const nav = $("tNav");
+      nav.replaceChildren();
+      if (!tournaments.length) {
+        const li = document.createElement("li");
+        li.className = "rounded-xl border border-white/10 bg-court-900/40 p-3 text-sm text-white/50";
+        li.textContent = "No assigned tournaments yet.";
+        nav.appendChild(li);
+        return;
+      }
+      const today = todayStr();
+      tournaments.forEach((t, idx) => {
+        const on = t.id === tid;
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "w-full rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-optic/40 " +
+          (on ? "border-optic/60 bg-optic/10" : "border-white/10 bg-court-900/40 hover:border-optic/40");
+        if (on) b.setAttribute("aria-current", "true");
+        const name = document.createElement("p");
+        name.className = "break-words font-display font-bold tracking-tight " + (on ? "text-optic" : "text-white");
+        name.textContent = t.name || "Untitled";
+        const sub = document.createElement("p");
+        sub.className = "mt-1 flex flex-wrap items-center gap-x-2 text-xs text-white/55";
+        const when = (t.date || "") === today ? "Today" : (t.date || "") > today ? "Upcoming" : "Finished";
+        const tag = document.createElement("span");
+        tag.className = "rounded-full px-2 py-0.5 text-[10px] font-semibold " + (when === "Today" ? "bg-optic/15 text-optic" : when === "Upcoming" ? "bg-sky-400/15 text-sky-200" : "bg-white/10 text-white/60");
+        tag.textContent = when;
+        sub.append(tag, document.createTextNode(formatDate(t.date)));
+        b.append(name, sub);
+        b.addEventListener("click", () => { if (t.id !== tid) selectTournament(t.id); closeSidebar(); });
+        li.appendChild(b);
+        if (!sbAnimated) enterEl(li, idx);
+        nav.appendChild(li);
+      });
+      sbAnimated = true;
+    }
+
+    // Switching tournaments fades the old content out, then the new games rise in.
+    function selectTournament(id) {
+      if (!tid) { enterAnim = true; selectTournamentNow(id); return; }
+      fadeSwap(() => selectTournamentNow(id));
+    }
+    async function selectTournamentNow(id) {
+      if (unsubScores) { unsubScores(); unsubScores = null; }
+      if (unsubPlayoffs) { unsubPlayoffs(); unsubPlayoffs = null; }
+      tid = id;
+      renderSidebar();
+      const cur = tournaments.find((x) => x.id === id);
+      $("tCurrent").textContent = cur ? (cur.name || "Untitled") : "No tournament selected";
+      games = [];
+      scores = {};
+      playoffs = {};
+      poError = "";
+      drafts.clear();
+      cat = "all"; statusFilter = "all"; query = "";
+      $("search").value = "";
+      try { localStorage.setItem("dinkhub_ref_tid", id); } catch (_) {}
+
+      const t = tournaments.find((x) => x.id === id);
+      const meta = $("tMeta");
+      meta.replaceChildren();
+      if (!t) {
+        meta.classList.add("hidden");
+        $("gamesSection").classList.add("hidden");
+        $("viewTabs").classList.add("hidden");
+        $("viewTabs").classList.remove("flex");
+        $("list").replaceChildren();
+        $("state").textContent = "Select a tournament to see its games.";
+        $("state").classList.remove("hidden");
+        return;
+      }
+      [[t.date ? formatDate(t.date) : "", "fa-calendar"], [t.location || "", "fa-location-dot"]].forEach(([text, icon]) => {
+        if (!text) return;
+        const s = document.createElement("span");
+        s.className = "inline-flex items-center gap-2";
+        const i = document.createElement("i");
+        i.className = "fa-solid " + icon + " text-xs text-optic";
+        s.append(i, document.createTextNode(text));
+        meta.appendChild(s);
+      });
+      meta.classList.toggle("hidden", !meta.childNodes.length);
+      meta.classList.toggle("flex", Boolean(meta.childNodes.length));
+
+      const state = $("state");
+      $("list").replaceChildren();
+      state.textContent = "Loading games...";
+      state.classList.remove("hidden");
+      try {
+        const snap = await get(ref(db, "games/" + id));
+        if (tid !== id) return; // switched tournament while loading
+        const items = [];
+        if (snap.exists()) snap.forEach((g) => { items.push({ id: g.key, ...g.val() }); });
+        games = items;
+        applyView();
+        // Live scores: every referee sees changes as they happen.
+        unsubScores = onValue(ref(db, "scores/" + id), (s) => {
+          scores = s.val() || {};
+          render();
+        }, (err) => {
+          state.textContent = isPermissionError(err) ? "Permission denied while reading scores." : "Couldn't load scores.";
+          state.classList.remove("hidden");
+        });
+        // Championship matches (semi-finals, third place, final).
+        unsubPlayoffs = onValue(ref(db, "playoffs/" + id), (s) => {
+          playoffs = s.val() || {};
+          poError = "";
+          render();
+        }, (err) => {
+          poError = isPermissionError(err)
+            ? "The database rules don't allow referees to read the championship yet (playoffs/" + id + ")."
+            : "Couldn't load the championship.";
+          render();
+        });
+        render();
+      } catch (err) {
+        state.textContent = isPermissionError(err)
+          ? "Permission denied. The database rules don't allow referees to read games yet."
+          : "Couldn't load games.";
+      }
+    }
+
+    // ---------- Rendering ----------
+    const statusOf = (g) => (scores[g.id] && scores[g.id].status) || "scheduled";
+    // The referee who started a game is the only one who can score and finish it.
+    const ownerOf = (sc) => (sc && (sc.startedBy || sc.updatedBy)) || null;
+    const ownerName = (sc) => (sc && (sc.startedByName || sc.updatedByName)) || "another referee";
+    const teamText = (tm) => [String((tm && tm.name) || ""), ...toList(tm && tm.players).map(String)];
+    const matches = (g, q) => !q || [...teamText(g.team1), ...teamText(g.team2)].some((s) => s.toLowerCase().includes(q));
+
+    function chipClass(on) {
+      return "rounded-full border px-4 py-1.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-optic/40 " +
+        (on ? "border-optic bg-optic text-court-900" : "border-white/15 text-white/70 hover:border-optic/50 hover:text-white");
+    }
+    function chipRow(el, items, current, onPick) {
+      el.replaceChildren();
+      items.forEach(([val, label]) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = chipClass(current === val);
+        b.textContent = label;
+        b.setAttribute("aria-pressed", String(current === val));
+        b.addEventListener("click", () => {
+          // Light up the chosen chip straight away (smooth colour transition) while the list fades.
+          el.querySelectorAll("button").forEach((x) => { x.className = chipClass(x === b); });
+          onPick(val);
+        });
+        el.appendChild(b);
+      });
+    }
+
+    // Don't rebuild the list while the referee is typing a score.
+    function render() {
+      const a = document.activeElement;
+      if (a && a.dataset && a.dataset.scoreInput) { renderPending = true; return; }
+      // Let an entrance animation finish before live data redraws the list.
+      const wait = animEnd - performance.now();
+      if (wait > 0) { clearTimeout(deferTimer); deferTimer = setTimeout(render, wait + 20); return; }
+      renderPending = false;
+      renderNow();
+    }
+    document.addEventListener("focusout", () => { if (renderPending) setTimeout(render, 0); });
+
+    function renderNow() {
+      renderCore();
+      if (enterAnim) { enterAnim = false; playEnter(); }
+    }
+    function renderCore() {
+      const state = $("state");
+      const list = $("list");
+      list.replaceChildren();
+      if (!tid) return;
+      if (view === "championship") { renderChampionship(); return; }
+
+      const counts = { all: games.length, scheduled: 0, live: 0, completed: 0 };
+      games.forEach((g) => { counts[statusOf(g)]++; });
+      setStat("stTotal", counts.all);
+      setStat("stLive", counts.live);
+      setStat("stDone", counts.completed);
+
+      chipRow($("statusChips"), [
+        ["all", "All (" + counts.all + ")"],
+        ["scheduled", "Scheduled (" + counts.scheduled + ")"],
+        ["live", "Live (" + counts.live + ")"],
+        ["completed", "Completed (" + counts.completed + ")"],
+      ], statusFilter, (v) => { statusFilter = v; swapList(); });
+
+      const cats = CAT_ORDER.filter((c) => games.some((g) => g.category === c));
+      games.forEach((g) => { if (g.category && !cats.includes(g.category)) cats.push(g.category); });
+      if (cat !== "all" && !cats.includes(cat)) cat = "all";
+      chipRow($("catChips"), cats.length > 1
+        ? [["all", "All categories"], ...cats.map((c) => [c, CATEGORY_LABELS[c] || c])]
+        : [], cat, (v) => { cat = v; swapList(); });
+
+      const q = query.trim().toLowerCase();
+      const shown = games.filter((g) =>
+        (cat === "all" || g.category === cat) &&
+        (statusFilter === "all" || statusOf(g) === statusFilter) &&
+        matches(g, q));
+
+      if (!games.length) {
+        state.textContent = "This tournament has no games.";
+        state.classList.remove("hidden");
+        return;
+      }
+      if (!shown.length) {
+        state.textContent = "No games match these filters.";
+        state.classList.remove("hidden");
+        return;
+      }
+      state.classList.add("hidden");
+
+      shown.sort((a, b) =>
+        CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category) ||
+        (a.round || 0) - (b.round || 0) ||
+        (a.number || 0) - (b.number || 0));
+
+      // category -> round -> games
+      const byCat = new Map();
+      shown.forEach((g) => {
+        if (!byCat.has(g.category)) byCat.set(g.category, new Map());
+        const rounds = byCat.get(g.category);
+        const r = g.round || 0;
+        if (!rounds.has(r)) rounds.set(r, []);
+        rounds.get(r).push(g);
+      });
+
+      byCat.forEach((rounds, c) => {
+        const sec = document.createElement("div");
+        const h = document.createElement("h2");
+        h.className = "font-display text-xl font-bold tracking-tight text-optic";
+        h.className += " flex items-center gap-2";
+        h.textContent = CATEGORY_LABELS[c] || c || "Games";
+        const hd = document.createElement("span");
+        hd.className = "h-2.5 w-2.5 rounded-full bg-optic";
+        h.prepend(hd);
+        sec.appendChild(h);
+        Array.from(rounds.keys()).sort((a, b) => a - b).forEach((r) => {
+          const rl = document.createElement("p");
+          rl.className = "mt-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-white/40 after:h-px after:flex-1 after:bg-white/10";
+          rl.textContent = "Round " + r;
+          const ul = document.createElement("ul");
+          ul.className = "mt-3 grid gap-3 xl:grid-cols-2";
+          rounds.get(r).forEach((g) => ul.appendChild(gameCard(g)));
+          sec.append(rl, ul);
+        });
+        list.appendChild(sec);
+      });
+    }
+    $("search").addEventListener("input", (e) => { query = e.target.value; render(); });
+
+    // ---------- A game card ----------
+    function btn(label, icon, cls, handler) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "inline-flex min-w-[7.5rem] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 " + cls;
+      const i = document.createElement("i");
+      i.className = "fa-solid " + icon + " text-xs";
+      b.append(i, document.createTextNode(label));
+      b.addEventListener("click", () => handler(b));
+      return b;
+    }
+    const PRIMARY = "bg-optic font-display font-bold text-court-900 hover:bg-optic-dark focus:ring-optic/50";
+    const OUTLINE = "border border-white/15 text-white hover:border-optic/50 hover:text-optic focus:ring-optic/30";
+
+    function clampScore(n) {
+      n = parseInt(n, 10);
+      if (isNaN(n) || n < 0) return 0;
+      return Math.min(n, MAX_SCORE);
+    }
+
+    function teamRow(team, score, opts) {
+      // opts: { mode: "none" | "view" | "edit", winner, onChange }
+      const row = document.createElement("div");
+      row.className = "flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition " + (opts.winner ? "border-optic/40 bg-optic/10" : "border-white/5 bg-court-900/60");
+
+      const info = document.createElement("div");
+      info.className = "min-w-[8rem] flex-1";
+      const name = document.createElement("p");
+      name.className = "flex items-center gap-2 break-words font-display font-bold tracking-tight " + (opts.winner ? "text-optic" : "");
+      name.textContent = (team && team.name) || "Team";
+      if (opts.winner) {
+        const tr = document.createElement("i");
+        tr.className = "fa-solid fa-trophy text-xs";
+        name.prepend(tr);
+      }
+      const players = document.createElement("p");
+      players.className = "mt-0.5 break-words text-sm text-white/55";
+      players.textContent = toList(team && team.players).join(" & ");
+      info.append(name, players);
+      row.appendChild(info);
+
+      if (opts.mode === "view") {
+        const s = document.createElement("span");
+        s.className = "min-w-[3.25rem] rounded-lg border border-white/10 bg-court-900 px-3 py-1 text-center font-display text-3xl font-extrabold tabular-nums " + (opts.winner ? "text-optic" : "text-white/80");
+        s.textContent = String(score);
+        if (opts.key) {
+          const prev = shownScores.get(opts.key);
+          shownScores.set(opts.key, score);
+          if (prev !== undefined && prev !== score && !REDUCED) s.classList.add("score-pop");
+        }
+        row.appendChild(s);
+      } else if (opts.mode === "edit") {
+        const wrap = document.createElement("div");
+        wrap.className = "flex shrink-0 items-center gap-1.5";
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.max = String(MAX_SCORE);
+        input.inputMode = "numeric";
+        input.value = String(score);
+        input.dataset.scoreInput = "1";
+        input.setAttribute("aria-label", "Score for " + ((team && team.name) || "team"));
+        input.className = "h-11 w-16 rounded-xl border border-white/15 bg-court-900 text-center font-display text-2xl font-extrabold tabular-nums text-white outline-none transition focus:border-optic focus:ring-4 focus:ring-optic/15";
+        const step = (delta, icon, label) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "grid h-11 w-11 place-items-center rounded-xl border border-white/15 text-white/80 transition hover:border-optic/50 hover:text-optic active:scale-95 focus:outline-none focus:ring-2 focus:ring-optic/30";
+          b.setAttribute("aria-label", label + " for " + ((team && team.name) || "team"));
+          b.innerHTML = '<i class="fa-solid ' + icon + '"></i>';
+          b.addEventListener("click", () => {
+            input.value = String(clampScore(clampScore(input.value) + delta));
+            input.classList.remove("score-pop");
+            void input.offsetWidth;
+            input.classList.add("score-pop");
+            opts.onChange();
+          });
+          return b;
+        };
+        input.addEventListener("input", () => {
+          if (input.value !== "" && String(clampScore(input.value)) !== input.value) input.value = String(clampScore(input.value));
+          opts.onChange();
+        });
+        input.addEventListener("blur", () => { input.value = String(clampScore(input.value)); opts.onChange(); });
+        input.addEventListener("focus", () => input.select());
+        wrap.append(step(-1, "fa-minus", "Subtract a point"), input, step(1, "fa-plus", "Add a point"));
+        row.appendChild(wrap);
+        row._input = input;
+      }
+      return row;
+    }
+
+    function gameCard(g) {
+      const sc = scores[g.id] || null;
+      const status = sc ? sc.status : "scheduled";
+      const li = document.createElement("li");
+      li.className = "relative overflow-hidden rounded-2xl border bg-court-800/70 p-4 pl-5 shadow-lg " + (status === "live" ? "border-optic/50" : status === "completed" ? "border-emerald-400/25" : "border-white/10");
+      const accent = document.createElement("span");
+      accent.className = "absolute inset-y-0 left-0 w-1.5 " + (status === "live" ? "bg-optic" : status === "completed" ? "bg-emerald-400/70" : "bg-white/15");
+      accent.setAttribute("aria-hidden", "true");
+      li.appendChild(accent);
+
+      const top = document.createElement("div");
+      top.className = "flex items-center justify-between gap-2";
+      const n = document.createElement("span");
+      n.className = "text-xs font-semibold uppercase tracking-widest text-white/45";
+      n.textContent = "Game " + (g.number || "") + " \u00b7 Round " + (g.round || "");
+      const badge = document.createElement("span");
+      badge.className = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold " + STATUS_STYLE[status];
+      if (status === "live") {
+        const dot = document.createElement("span");
+        dot.className = "live-dot h-1.5 w-1.5 rounded-full bg-optic";
+        badge.appendChild(dot);
+      }
+      badge.appendChild(document.createTextNode(STATUS_LABELS[status]));
+      top.append(n, badge);
+      li.appendChild(top);
+
+      const body = document.createElement("div");
+      body.className = "mt-3 space-y-2";
+      li.appendChild(body);
+
+      const actions = document.createElement("div");
+      actions.className = "mt-3 flex flex-wrap gap-2";
+
+      const mine = !sc || !ownerOf(sc) || ownerOf(sc) === me.uid;
+
+      if (status === "scheduled") {
+        body.append(teamRow(g.team1, 0, { mode: "none" }), teamRow(g.team2, 0, { mode: "none" }));
+        actions.append(btn("Start game", "fa-table-tennis-paddle-ball", PRIMARY, (b) => run(b, () => writeScore(g, "live", 0, 0), "Game started.")));
+      } else if (status === "live" && !mine) {
+        // Someone else started this game: show the live score, read-only.
+        const a = sc.team1Score || 0, b2 = sc.team2Score || 0;
+        body.append(teamRow(g.team1, a, { mode: "view", key: g.id + "|1" }), teamRow(g.team2, b2, { mode: "view", key: g.id + "|2" }));
+        const lock = document.createElement("p");
+        lock.className = "flex items-start gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60";
+        const lic = document.createElement("i");
+        lic.className = "fa-solid fa-lock mt-0.5 text-optic/80";
+        lock.append(lic, document.createTextNode("Only " + ownerName(sc) + " can enter the score and finish this game."));
+        body.appendChild(lock);
+      } else if (status === "live") {
+        const d = drafts.get(g.id);
+        const r1 = sc.team1Score || 0, r2 = sc.team2Score || 0;
+        const start1 = d ? d.t1 : r1, start2 = d ? d.t2 : r2;
+        let row1, row2, save, finish;
+        const note = document.createElement("p");
+        note.className = "hidden text-xs text-amber-200";
+        note.textContent = "Unsaved changes";
+        const read = () => ({ t1: clampScore(row1._input.value), t2: clampScore(row2._input.value) });
+        const sync = () => {
+          const v = read();
+          const dirty = v.t1 !== r1 || v.t2 !== r2;
+          if (dirty) drafts.set(g.id, v); else drafts.delete(g.id);
+          note.classList.toggle("hidden", !dirty);
+          save.disabled = !dirty;
+        };
+        row1 = teamRow(g.team1, start1, { mode: "edit", onChange: () => sync() });
+        row2 = teamRow(g.team2, start2, { mode: "edit", onChange: () => sync() });
+        body.append(row1, row2, note);
+        save = btn("Save score", "fa-floppy-disk", OUTLINE, (b) => { const v = read(); run(b, () => writeScore(g, "live", v.t1, v.t2).then(() => drafts.delete(g.id)), "Score saved."); });
+        finish = btn("Finish game", "fa-flag-checkered", PRIMARY, () => { const v = read(); openFinish(g, v.t1, v.t2); });
+        actions.append(save, finish);
+        sync();
+      } else {
+        const a = sc.team1Score || 0, b2 = sc.team2Score || 0;
+        body.append(
+          teamRow(g.team1, a, { mode: "view", winner: a > b2, key: g.id + "|1" }),
+          teamRow(g.team2, b2, { mode: "view", winner: b2 > a, key: g.id + "|2" })
+        );
+        if (mine) actions.append(btn("Reopen game", "fa-rotate-left", OUTLINE, (b) => run(b, () => writeScore(g, "live", a, b2), "Game reopened.")));
+      }
+      if (actions.children.length) li.appendChild(actions);
+
+      if (sc && sc.updatedByName) {
+        const by = document.createElement("p");
+        by.className = "mt-3 text-xs text-white/40";
+        by.textContent = (status === "completed" ? "Scored by " : "Started by ") + (status === "completed" ? sc.updatedByName : ownerName(sc));
+        li.appendChild(by);
+      }
+      return li;
+    }
+
+    // ---------- Saving scores ----------
+    async function writeScore(g, status, t1, t2, confirmed = false) {
+      if (!me || !tid) throw new Error("not-ready");
+      if (status === "completed" && !confirmed) throw new Error("not-confirmed");
+      const prev = scores[g.id] || {};
+      const owner = ownerOf(prev);
+      if (prev.status && owner && owner !== me.uid) {
+        const e = new Error("not-owner");
+        e.ownerName = ownerName(prev);
+        throw e;
+      }
+      const data = {
+        team1Score: t1,
+        team2Score: t2,
+        status,
+        updatedBy: me.uid,
+        updatedByName: me.name,
+        updatedAt: serverTimestamp(),
+      };
+      data.startedAt = prev.startedAt || serverTimestamp();
+      data.startedBy = owner || me.uid;
+      data.startedByName = prev.startedByName || (owner ? prev.updatedByName : "") || me.name;
+      if (status === "completed") {
+        data.finishedAt = serverTimestamp();
+        // Both team representatives agreed the score is correct (reopening the game clears this).
+        data.team1Confirmed = true;
+        data.team2Confirmed = true;
+        data.confirmedAt = serverTimestamp();
+      }
+      await update(ref(db), { ["scores/" + tid + "/" + g.id]: data });
+    }
+
+    async function run(button, task, okMsg) {
+      button.disabled = true;
+      try {
+        await task();
+        if (okMsg) showToast(okMsg);
+      } catch (err) {
+        button.disabled = false;
+        if (err && err.message === "not-owner") { showToast("Only " + (err.ownerName || "the referee who started this game") + " can score this game."); return; }
+        showToast(isPermissionError(err)
+          ? "Permission denied. The database rules don't allow scoring yet, or the games aren't confirmed."
+          : "Couldn't save. Check your connection and try again.");
+      }
+    }
+
+    // ---------- Championship (semi-finals, third place, final) ----------
+    // Matches live in playoffs/<tournamentId>/<category>/<sf1|sf2|third|final>. The teams are never stored as
+    // fixtures: they come from the standings (top 4) and from earlier results, so the bracket can't drift.
+    // A category's championship opens once every one of its games is completed.
+    function paintTabs(v) {
+      [["tabGames", "games", "fa-table-tennis-paddle-ball", "Games"], ["tabChamp", "championship", "fa-crown", "Championship"]].forEach(([id, name, icon, label]) => {
+        const b = $(id);
+        b.className = chipClass(v === name) + " inline-flex items-center gap-2";
+        b.setAttribute("aria-pressed", String(v === name));
+        if (!b.firstChild) {
+          const i = document.createElement("i");
+          i.className = "fa-solid " + icon + " text-xs";
+          b.append(i, document.createTextNode(label));
+        }
+      });
+    }
+    function applyView() {
+      const has = Boolean(tid && tournaments.some((x) => x.id === tid));
+      const tabs = $("viewTabs");
+      tabs.classList.toggle("hidden", !has);
+      tabs.classList.toggle("flex", has);
+      $("gamesSection").classList.toggle("hidden", !has || view !== "games");
+      paintTabs(view);
+    }
+    // Switching Games <-> Championship: the tab lights up at once, the content fades out, swaps and fades in.
+    function setView(v) {
+      if (v === view) return;
+      paintTabs(v);
+      fadeSwap(() => {
+        view = v;
+        applyView();
+        renderPending = false;
+        renderNow();
+      }, [$("list"), $("state"), $("gamesSection")]);
+    }
+    $("tabGames").addEventListener("click", () => setView("games"));
+    $("tabChamp").addEventListener("click", () => setView("championship"));
+
+    // Same ranking the admin dashboard uses: wins -> head-to-head (two-team tie that played) -> point difference
+    // -> points scored -> name. Only completed games count.
+    function computeStandings(t, gms, scs) {
+      const cats = new Map();
+      const catOf = (k) => {
+        if (!cats.has(k)) cats.set(k, { key: k, rows: new Map(), results: [], total: 0, done: 0, live: 0 });
+        return cats.get(k);
+      };
+      const addTeam = (c, tm) => {
+        const name = String((tm && tm.name) || "");
+        if (!name) return null;
+        if (!c.rows.has(name)) c.rows.set(name, { name, players: toList(tm && tm.players).map(String), gp: 0, w: 0, l: 0, pf: 0, pa: 0 });
+        return c.rows.get(name);
+      };
+      const teams = (t && t.teams) || {};
+      Object.keys(teams).forEach((k) => { const c = catOf(k); toList(teams[k]).forEach((tm) => addTeam(c, tm)); });
+      toList(t && t.categories).forEach((k) => catOf(String(k)));
+
+      gms.slice().sort((a, b) => (a.round || 0) - (b.round || 0) || (a.number || 0) - (b.number || 0)).forEach((g) => {
+        const c = catOf(g.category);
+        const r1 = addTeam(c, g.team1), r2 = addTeam(c, g.team2);
+        c.total++;
+        const sc = scs[g.id];
+        if (!sc || !r1 || !r2) return;
+        if (sc.status === "live") { c.live++; return; }
+        if (sc.status !== "completed") return;
+        const s1 = Number(sc.team1Score) || 0, s2 = Number(sc.team2Score) || 0;
+        if (s1 === s2) return;
+        c.done++;
+        r1.gp++; r2.gp++;
+        r1.pf += s1; r1.pa += s2; r2.pf += s2; r2.pa += s1;
+        if (s1 > s2) { r1.w++; r2.l++; } else { r2.w++; r1.l++; }
+        c.results.push({ a: r1.name, b: r2.name, sa: s1, sb: s2 });
+      });
+
+      const order = ["mens", "womens", "mixed"];
+      return Array.from(cats.values())
+        .sort((a, b) => (order.indexOf(a.key) < 0 ? 9 : order.indexOf(a.key)) - (order.indexOf(b.key) < 0 ? 9 : order.indexOf(b.key)))
+        .map((c) => ({ key: c.key, total: c.total, done: c.done, live: c.live, rows: rankRows(Array.from(c.rows.values()), c.results) }));
+    }
+
+    function rankRows(rows, results) {
+      rows.forEach((r) => { r.pd = r.pf - r.pa; });
+      const sorted = rows.slice().sort((a, b) => b.w - a.w || a.name.localeCompare(b.name));
+      const out = [];
+      let i = 0;
+      while (i < sorted.length) {
+        let j = i;
+        while (j < sorted.length && sorted[j].w === sorted[i].w) j++;
+        const grp = sorted.slice(i, j);
+        if (grp.length > 1) {
+          grp.forEach((r) => { r.hw = 0; });
+          if (grp.length === 2) {
+            const [A, B] = grp;
+            results.forEach((x) => {
+              if ((x.a === A.name && x.b === B.name) || (x.a === B.name && x.b === A.name)) {
+                const winner = x.sa > x.sb ? x.a : x.b;
+                (winner === A.name ? A : B).hw++;
+              }
+            });
+          }
+          grp.sort((a, b) => b.hw - a.hw || b.pd - a.pd || b.pf - a.pf || a.name.localeCompare(b.name));
+        }
+        out.push(...grp);
+        i = j;
+      }
+      return out;
+    }
+
+    // The four matches of one category, worked out from its standings and the saved championship records.
+    function chBracket(c, po) {
+      po = po || {};
+      const unlocked = c.total > 0 && c.done === c.total && c.live === 0 && c.rows.length >= 4;
+      const top = c.rows.slice(0, 4);
+      const mk = (id, stage, label, t1, t2, seeds, ph) => {
+        const known = Boolean(t1 && t2);
+        let m = po[id] || null, stale = false;
+        if (m && (!known || m.team1 !== t1.name || m.team2 !== t2.name)) { m = null; stale = true; }  // teams changed since it was saved
+        const done = Boolean(m && m.status === "completed" && Number(m.team1Score) !== Number(m.team2Score));
+        const s1 = m ? Number(m.team1Score) || 0 : 0, s2 = m ? Number(m.team2Score) || 0 : 0;
+        return { id, stage, label, t1, t2, seeds, ph, known, m, stale, done, s1, s2,
+          w: done ? (s1 > s2 ? t1 : t2) : null, l: done ? (s1 > s2 ? t2 : t1) : null };
+      };
+      const sf1 = mk("sf1", "Semi-finals", "Semi-final 1", top[0], top[3], [1, 4], ["1st place", "4th place"]);
+      const sf2 = mk("sf2", "Semi-finals", "Semi-final 2", top[1], top[2], [2, 3], ["2nd place", "3rd place"]);
+      const third = mk("third", "Finals", "Third-place match", sf1.l, sf2.l, null, ["Loser of Semi-final 1", "Loser of Semi-final 2"]);
+      const fin = mk("final", "Championship", "Championship match", sf1.w, sf2.w, null, ["Winner of Semi-final 1", "Winner of Semi-final 2"]);
+      return { unlocked, matches: [sf1, sf2, third, fin], champion: fin.w, runnerUp: fin.l, thirdPlace: third.w };
+    }
+
+    // Starts, scores, finishes or reopens a match. The referee who starts it is the only one who can score it.
+    async function writePlayoff(c, mt, po, status, t1, t2, confirmed = false) {
+      if (!me || !tid) throw new Error("not-ready");
+      if (status === "completed" && !confirmed) throw new Error("not-confirmed");
+      const prev = mt.m || null;
+      const owner = prev ? ownerOf(prev) : null;
+      if (prev && owner && owner !== me.uid) {
+        const e = new Error("not-owner");
+        e.ownerName = ownerName(prev);
+        throw e;
+      }
+      const data = {
+        team1: mt.t1.name,
+        team2: mt.t2.name,
+        team1Score: t1,
+        team2Score: t2,
+        status,
+        updatedBy: me.uid,
+        updatedByName: me.name,
+        updatedByEmail: me.email,
+        updatedAt: serverTimestamp(),
+      };
+      data.startedAt = (prev && prev.startedAt) || serverTimestamp();
+      data.startedBy = owner || me.uid;
+      data.startedByName = (prev && prev.startedByName) || (prev && owner ? prev.updatedByName : "") || me.name;
+      if (status === "completed") {
+        data.finishedAt = serverTimestamp();
+        data.team1Confirmed = true;   // both team representatives agreed the score is correct
+        data.team2Confirmed = true;
+        data.confirmedAt = serverTimestamp();
+      }
+      const base = "playoffs/" + tid + "/" + c.key + "/";
+      const updates = { [base + mt.id]: data };
+      // A semi-final that is being (re)played means the finalists are not settled, so later scores are cleared.
+      if ((mt.id === "sf1" || mt.id === "sf2") && status === "live" && po && (po.third || po.final)) {
+        updates[base + "third"] = null;
+        updates[base + "final"] = null;
+      }
+      await update(ref(db), updates);
+    }
+
+    function placeholderRow(text) {
+      const row = document.createElement("div");
+      row.className = "rounded-xl border border-white/5 bg-court-900/40 px-3 py-3 text-sm italic text-white/35";
+      row.textContent = text;
+      return row;
+    }
+
+    function matchCard(c, mt, po) {
+      const key = "po|" + c.key + "|" + mt.id;
+      const m = mt.m;
+      const inPlay = Boolean(m) && !mt.done;
+      const mine = !m || !ownerOf(m) || ownerOf(m) === me.uid;
+      const status = mt.done ? "completed" : inPlay ? "live" : "scheduled";
+
+      const li = document.createElement("div");
+      li.className = "relative overflow-hidden rounded-2xl border bg-court-800/70 p-4 pl-5 shadow-lg " +
+        (inPlay ? "border-optic/50" : mt.done ? "border-emerald-400/25" : mt.known ? "border-white/10" : "border-white/5 opacity-80");
+      const accent = document.createElement("span");
+      li.dataset.card = "1";
+      accent.className = "absolute inset-y-0 left-0 w-1.5 " + (inPlay ? "bg-optic" : mt.done ? "bg-emerald-400/70" : "bg-white/15");
+      accent.setAttribute("aria-hidden", "true");
+      li.appendChild(accent);
+
+      const top = document.createElement("div");
+      top.className = "flex items-center justify-between gap-2";
+      const lab = document.createElement("span");
+      lab.className = "text-xs font-semibold uppercase tracking-widest text-white/45";
+      lab.textContent = mt.label;
+      const badge = document.createElement("span");
+      badge.className = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold " + (mt.known ? STATUS_STYLE[status] : "bg-white/10 text-white/55");
+      if (inPlay) {
+        const dot = document.createElement("span");
+        dot.className = "live-dot h-1.5 w-1.5 rounded-full bg-optic";
+        badge.appendChild(dot);
+      }
+      badge.appendChild(document.createTextNode(mt.known ? STATUS_LABELS[status] : "Waiting"));
+      top.append(lab, badge);
+      li.appendChild(top);
+
+      const body = document.createElement("div");
+      body.className = "mt-3 space-y-2";
+      li.appendChild(body);
+      const actions = document.createElement("div");
+      actions.className = "mt-3 flex flex-wrap gap-2";
+
+      if (!mt.known) {
+        body.append(placeholderRow(mt.ph[0]), placeholderRow(mt.ph[1]));
+      } else if (!m) {
+        body.append(teamRow(mt.t1, 0, { mode: "none" }), teamRow(mt.t2, 0, { mode: "none" }));
+        actions.append(btn("Start match", "fa-table-tennis-paddle-ball", PRIMARY, (b) => run(b, () => writePlayoff(c, mt, po, "live", 0, 0), "Match started.")));
+      } else if (inPlay && !mine) {
+        body.append(teamRow(mt.t1, mt.s1, { mode: "view", key: key + "|1" }), teamRow(mt.t2, mt.s2, { mode: "view", key: key + "|2" }));
+        const lock = document.createElement("p");
+        lock.className = "flex items-start gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60";
+        const lic = document.createElement("i");
+        lic.className = "fa-solid fa-lock mt-0.5 text-optic/80";
+        lock.append(lic, document.createTextNode("Only " + ownerName(m) + " can enter the score and finish this match."));
+        body.appendChild(lock);
+      } else if (inPlay) {
+        const d = drafts.get(key);
+        const start1 = d ? d.t1 : mt.s1, start2 = d ? d.t2 : mt.s2;
+        let row1, row2, save;
+        const note = document.createElement("p");
+        note.className = "hidden text-xs text-amber-200";
+        note.textContent = "Unsaved changes";
+        const read = () => ({ t1: clampScore(row1._input.value), t2: clampScore(row2._input.value) });
+        const sync = () => {
+          const v = read();
+          const dirty = v.t1 !== mt.s1 || v.t2 !== mt.s2;
+          if (dirty) drafts.set(key, v); else drafts.delete(key);
+          note.classList.toggle("hidden", !dirty);
+          save.disabled = !dirty;
+        };
+        row1 = teamRow(mt.t1, start1, { mode: "edit", onChange: () => sync() });
+        row2 = teamRow(mt.t2, start2, { mode: "edit", onChange: () => sync() });
+        body.append(row1, row2, note);
+        save = btn("Save score", "fa-floppy-disk", OUTLINE, (b) => { const v = read(); run(b, () => writePlayoff(c, mt, po, "live", v.t1, v.t2).then(() => drafts.delete(key)), "Score saved."); });
+        const finish = btn("Finish match", "fa-flag-checkered", PRIMARY, () => {
+          const v = read();
+          openFinish({ team1: mt.t1, team2: mt.t2, label: (CATEGORY_LABELS[c.key] || c.key) + " \u00b7 " + mt.label }, v.t1, v.t2, { c, mt, po, key });
+        });
+        actions.append(save, finish);
+        sync();
+      } else {
+        body.append(
+          teamRow(mt.t1, mt.s1, { mode: "view", winner: mt.s1 > mt.s2, key: key + "|1" }),
+          teamRow(mt.t2, mt.s2, { mode: "view", winner: mt.s2 > mt.s1, key: key + "|2" })
+        );
+        if (mine) {
+          const isSemi = mt.id === "sf1" || mt.id === "sf2";
+          actions.append(btn("Reopen match", "fa-rotate-left", OUTLINE, (b) => {
+            if (isSemi && po && (po.third || po.final) &&
+                !window.confirm("Reopening this semi-final also clears the third-place and championship scores. Continue?")) return;
+            run(b, () => writePlayoff(c, mt, po, "live", mt.s1, mt.s2), "Match reopened.");
+          }));
+        }
+      }
+      if (actions.children.length) li.appendChild(actions);
+
+      if (mt.stale) {
+        const n = document.createElement("p");
+        n.className = "mt-3 text-xs text-amber-200";
+        n.textContent = "The teams changed since a score was saved here, so it was ignored.";
+        li.appendChild(n);
+      }
+      if (m && m.updatedByName) {
+        const by = document.createElement("p");
+        by.className = "mt-3 text-xs text-white/40";
+        by.textContent = (mt.done ? "Scored by " : "Started by ") + (mt.done ? m.updatedByName : ownerName(m));
+        li.appendChild(by);
+      }
+      return li;
+    }
+
+    function categoryCard(c, t) {
+      const po = (playoffs && playoffs[c.key]) || {};
+      const br = chBracket(c, po);
+      const card = document.createElement("div");
+      card.className = "overflow-hidden rounded-2xl border border-white/10 bg-court-800/50";
+
+      const head = document.createElement("div");
+      head.className = "flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5";
+      const left = document.createElement("div");
+      const h = document.createElement("h3");
+      h.className = "font-display text-lg font-bold tracking-tight text-optic";
+      h.textContent = CATEGORY_LABELS[c.key] || c.key;
+      const meta = document.createElement("p");
+      meta.className = "text-xs text-white/45";
+      meta.textContent = c.rows.length + (c.rows.length === 1 ? " team" : " teams") + " \u00b7 " + c.done + " of " + c.total + " games completed";
+      left.append(h, meta);
+      const badge = document.createElement("span");
+      badge.className = "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold " +
+        (br.champion ? "bg-optic/15 text-optic" : br.unlocked ? "bg-sky-400/15 text-sky-200" : "bg-white/10 text-white/60");
+      const bi = document.createElement("i");
+      bi.className = "fa-solid " + (br.champion ? "fa-crown" : br.unlocked ? "fa-bolt" : "fa-lock");
+      badge.append(bi, document.createTextNode(br.champion ? "Champions crowned" : br.unlocked ? "Championship open" : "Locked"));
+      head.append(left, badge);
+      card.appendChild(head);
+
+      const body = document.createElement("div");
+      body.className = "border-t border-white/10 px-4 pb-5 pt-4 sm:px-5";
+      card.appendChild(body);
+
+      if (!br.unlocked) {
+        const lock = document.createElement("div");
+        lock.className = "rounded-xl border border-dashed border-white/15 bg-white/5 p-5 text-center";
+        const ic = document.createElement("i");
+        ic.className = "fa-solid fa-lock text-2xl text-white/35";
+        const msg = document.createElement("p");
+        msg.className = "mt-3 text-sm text-white/65";
+        msg.textContent = c.rows.length < 4
+          ? "The championship needs at least 4 teams, and this category has " + c.rows.length + "."
+          : c.total === 0
+            ? "No games were generated for this category yet."
+            : "The championship opens when every game in this category is completed (" + c.done + " of " + c.total + " so far)" +
+              (c.live ? ", and " + c.live + (c.live === 1 ? " game is" : " games are") + " still live." : ".");
+        lock.append(ic, msg);
+        body.appendChild(lock);
+        return card;
+      }
+
+      if (br.champion) {
+        const ban = document.createElement("div");
+        ban.className = "mb-5 flex flex-wrap items-center gap-4 rounded-2xl border border-optic/40 bg-optic/10 p-4";
+        const tr = document.createElement("div");
+        tr.className = "grid h-14 w-14 shrink-0 place-items-center rounded-full bg-optic text-2xl text-court-900";
+        const tri = document.createElement("i");
+        tri.className = "fa-solid fa-trophy";
+        tr.appendChild(tri);
+        const tx = document.createElement("div");
+        tx.className = "min-w-0 flex-1";
+        const l1 = document.createElement("p");
+        l1.className = "text-xs font-semibold uppercase tracking-widest text-optic/80";
+        l1.textContent = "Champions";
+        const l2 = document.createElement("p");
+        l2.className = "break-words font-display text-2xl font-extrabold tracking-tight";
+        l2.textContent = br.champion.name;
+        const l3 = document.createElement("p");
+        l3.className = "break-words text-sm text-white/60";
+        l3.textContent = (br.champion.players || []).join(" & ");
+        tx.append(l1, l2, l3);
+        ban.append(tr, tx);
+        const places = [["Runner-up", br.runnerUp], ["Third place", br.thirdPlace]].filter((x) => x[1]);
+        if (places.length) {
+          const pw = document.createElement("div");
+          pw.className = "flex flex-wrap gap-4 text-sm";
+          places.forEach(([lb, tm]) => {
+            const p = document.createElement("p");
+            p.className = "text-white/70";
+            const sp = document.createElement("span");
+            sp.className = "block text-[11px] font-semibold uppercase tracking-widest text-white/40";
+            sp.textContent = lb;
+            p.append(sp, document.createTextNode(tm.name));
+            pw.appendChild(p);
+          });
+          ban.appendChild(pw);
+        }
+        body.appendChild(ban);
+      }
+
+      ["Semi-finals", "Finals", "Championship"].forEach((stage) => {
+        const sec = document.createElement("div");
+        sec.className = "mb-5 last:mb-0";
+        const st = document.createElement("h4");
+        st.className = "mb-2 font-display text-sm font-bold uppercase tracking-widest text-white/60";
+        st.textContent = stage;
+        const ms = br.matches.filter((x) => x.stage === stage);
+        const grid = document.createElement("div");
+        grid.className = "grid gap-3 " + (ms.length > 1 ? "xl:grid-cols-2" : "");
+        ms.forEach((x) => grid.appendChild(matchCard(c, x, po)));
+        sec.append(st, grid);
+        body.appendChild(sec);
+      });
+      return card;
+    }
+
+    function renderChampionship() {
+      const state = $("state"), list = $("list");
+      const t = tournaments.find((x) => x.id === tid);
+      if (!t) return;
+      if (poError) {
+        const n = document.createElement("p");
+        n.className = "rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-3 text-xs text-amber-100";
+        n.textContent = poError;
+        list.appendChild(n);
+      }
+      if (!games.length) {
+        state.textContent = "This tournament has no games, so there is no championship yet.";
+        state.classList.remove("hidden");
+        return;
+      }
+      const cats = computeStandings(t, games, scores).filter((c) => c.rows.length);
+      if (!cats.length) {
+        state.textContent = "This tournament has no teams yet.";
+        state.classList.remove("hidden");
+        return;
+      }
+      state.classList.add("hidden");
+      cats.forEach((c) => list.appendChild(categoryCard(c, t)));
+    }
+
+    // ---------- Finish confirmation ----------
+    const fmModal = $("fmModal");
+    let finishing = null; // { g, t1, t2, pl }  (pl is set for a championship match)
+    function openFinish(g, t1, t2, pl = null) {
+      if (t1 === t2) { showToast("A game can't end in a tie. Adjust the score first."); return; }
+      finishing = { g, t1, t2, pl };
+      $("fmGame").textContent = g.label || ("Game " + (g.number || "") + " \u00b7 Round " + (g.round || ""));
+      $("fmTeam1").textContent = (g.team1 && g.team1.name) || "Team 1";
+      $("fmTeam2").textContent = (g.team2 && g.team2.name) || "Team 2";
+      $("fmScore1").textContent = String(t1);
+      $("fmScore2").textContent = String(t2);
+      $("fmScore1").className = "font-display text-2xl font-extrabold " + (t1 > t2 ? "text-optic" : "text-white/70");
+      $("fmScore2").className = "font-display text-2xl font-extrabold " + (t2 > t1 ? "text-optic" : "text-white/70");
+      $("fmConfName1").textContent = (g.team1 && g.team1.name) || "Team 1";
+      $("fmConfName2").textContent = (g.team2 && g.team2.name) || "Team 2";
+      $("fmConf1").checked = false;
+      $("fmConf2").checked = false;
+      $("fmGo").disabled = true; // stays off until both representatives confirm
+      $("fmGo").textContent = "Finish";
+      fmModal.classList.remove("hidden", "modal-out");
+      setTimeout(() => $("fmConf1").focus(), 50);
+    }
+    function closeFinish() {
+      finishing = null;
+      fmModal.classList.add("modal-out");
+      setTimeout(() => {
+        if (!finishing) { fmModal.classList.add("hidden"); fmModal.classList.remove("modal-out"); }
+      }, 200);
+    }
+    $("fmCancel").addEventListener("click", closeFinish);
+    fmModal.addEventListener("click", (e) => { if (e.target === fmModal) closeFinish(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !fmModal.classList.contains("hidden")) closeFinish(); });
+    const syncFinish = () => { $("fmGo").disabled = !($("fmConf1").checked && $("fmConf2").checked); };
+    $("fmConf1").addEventListener("change", syncFinish);
+    $("fmConf2").addEventListener("change", syncFinish);
+    $("fmGo").addEventListener("click", async () => {
+      if (!finishing) return;
+      if (!($("fmConf1").checked && $("fmConf2").checked)) { showToast("Both team representatives must confirm the score."); return; }
+      const { g, t1, t2, pl } = finishing;
+      $("fmGo").disabled = true;
+      $("fmGo").textContent = "Saving...";
+      try {
+        if (pl) {
+          await writePlayoff(pl.c, pl.mt, pl.po, "completed", t1, t2, true);
+          drafts.delete(pl.key);
+        } else {
+          await writeScore(g, "completed", t1, t2, true);
+          drafts.delete(g.id);
+        }
+        closeFinish();
+        showToast(pl ? "Match finished." : "Game finished.");
+      } catch (err) {
+        $("fmGo").disabled = false;
+        $("fmGo").textContent = "Finish";
+        if (err && err.message === "not-owner") { closeFinish(); showToast("Only " + (err.ownerName || "the referee who started this game") + " can finish this game."); return; }
+        showToast(isPermissionError(err) ? "Permission denied. Check the database rules." : "Couldn't save. Please try again.");
+      }
+    });
+  </script>
+  </body>
+</html>

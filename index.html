@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DinkHub | Login</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            court: { 900: "#0b2a24", 800: "#0f3a32", 700: "#14493f", 600: "#1b5e51" },
+            optic: { DEFAULT: "#d7ff3f", dark: "#b9e01f" },
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', "sans-serif"],
+            body: ['"DM Sans"', "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet" />
+    <link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style>
+    @keyframes bounceBall {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-22px) rotate(12deg); }
+    }
+    @keyframes shadowPulse {
+      0%, 100% { transform: scaleX(1); opacity: .35; }
+      50% { transform: scaleX(.7); opacity: .18; }
+    }
+    .ball { animation: bounceBall 1.8s ease-in-out infinite; }
+    .ball-shadow { animation: shadowPulse 1.8s ease-in-out infinite; }
+    @keyframes pageFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes loadBar {
+      from { width: 0%; }
+      to { width: 100%; }
+    }
+    .page-enter { animation: pageFadeIn .7s ease-out both; }
+    body { transition: opacity .6s ease; }
+    body.fade-out { opacity: 0; }
+    #successOverlay {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .5s ease;
+    }
+    #successOverlay.show { opacity: 1; pointer-events: auto; }
+    .load-bar { animation: loadBar 1.8s ease-in-out forwards; }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes drawLine {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes alertIn {
+      from { opacity: 0; transform: translateY(-8px) scale(.98); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes shake {
+      10%, 90% { transform: translateX(-1px); }
+      20%, 80% { transform: translateX(3px); }
+      30%, 50%, 70% { transform: translateX(-5px); }
+      40%, 60% { transform: translateX(5px); }
+    }
+    @keyframes iconPop {
+      0% { transform: scale(.4) rotate(-40deg); opacity: 0; }
+      70% { transform: scale(1.2) rotate(8deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0); }
+    }
+    /* Staggered entrance. Uses "backwards" so hover transforms still work afterwards. */
+    .rise { animation: riseIn .75s cubic-bezier(.22, 1, .36, 1) backwards; animation-delay: var(--d, 0ms); }
+    .court-line {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: drawLine 1.8s ease-out forwards;
+      animation-delay: var(--d, 0ms);
+    }
+    .alert-in { animation: alertIn .35s ease-out; }
+    .shake { animation: shake .5s cubic-bezier(.36, .07, .19, .97); }
+    .icon-pop { animation: iconPop .35s ease-out; }
+    @media (prefers-reduced-motion: reduce) {
+      .ball, .ball-shadow, .page-enter, .load-bar, .rise, .alert-in, .shake, .icon-pop { animation: none !important; }
+      .court-line { animation: none; stroke-dashoffset: 0; }
+      .load-bar { width: 100%; }
+      body, #successOverlay { transition: none; }
+    }
+  </style>
+  </head>
+
+  <body class="font-body bg-court-900 text-white min-h-screen">
+    <main class="page-enter min-h-screen grid lg:grid-cols-2">
+
+      <!-- Left: court artwork -->
+      <section
+        class="relative hidden lg:flex flex-col justify-between overflow-hidden bg-court-800 p-12">
+        <div
+          class="pointer-events-none absolute -right-24 -top-24 h-80 w-80 animate-pulse rounded-full bg-optic/10 blur-3xl"
+          aria-hidden="true"></div>
+        <div
+          class="pointer-events-none absolute -bottom-32 -left-20 h-72 w-72 animate-pulse rounded-full bg-court-600/40 blur-3xl"
+          style="animation-delay: 1.2s" aria-hidden="true"></div>
+
+        <svg class="absolute inset-0 w-full h-full opacity-40"
+          viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true">
+          <g fill="none" stroke="#d7ff3f" stroke-width="3"
+            stroke-opacity=".55">
+            <rect class="court-line" pathLength="1" x="80" y="90"
+              width="440" height="620" rx="4" />
+            <line class="court-line" pathLength="1"
+              style="--d:700ms" x1="80" y1="400" x2="520" y2="400"
+              stroke-width="6" stroke-opacity=".9" />
+            <line class="court-line" pathLength="1"
+              style="--d:1000ms" x1="80" y1="260" x2="520"
+              y2="260" />
+            <line class="court-line" pathLength="1"
+              style="--d:1200ms" x1="80" y1="540" x2="520"
+              y2="540" />
+            <line class="court-line" pathLength="1"
+              style="--d:1400ms" x1="300" y1="90" x2="300"
+              y2="260" />
+            <line class="court-line" pathLength="1"
+              style="--d:1500ms" x1="300" y1="540" x2="300"
+              y2="710" />
+          </g>
+        </svg>
+
+        <div class="rise relative flex items-center gap-3"
+          style="--d:100ms">
+          <div
+            class="h-10 w-10 rounded-full bg-optic grid place-items-center">
+            <span class="h-3 w-3 rounded-full bg-court-900"></span>
+          </div>
+          <span
+            class="font-display text-2xl font-extrabold tracking-tight">Dink<span
+              class="text-optic">Hub</span></span>
+        </div>
+
+        <div class="rise relative flex flex-col items-center"
+          style="--d:250ms">
+          <svg class="ball w-36 h-36 drop-shadow-2xl"
+            viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="46" fill="#d7ff3f" />
+            <g fill="#0b2a24" fill-opacity=".85">
+              <circle cx="50" cy="22" r="5" /><circle cx="28"
+                cy="34" r="5" /><circle cx="72" cy="34" r="5" />
+              <circle cx="50" cy="48" r="5" /><circle cx="24"
+                cy="58" r="5" /><circle cx="76" cy="58" r="5" />
+              <circle cx="38" cy="72" r="5" /><circle cx="62"
+                cy="72" r="5" />
+            </g>
+          </svg>
+          <div
+            class="ball-shadow mt-3 h-3 w-24 rounded-full bg-black"></div>
+        </div>
+
+        <div class="rise relative" style="--d:450ms">
+          <h2
+            class="font-display text-5xl font-extrabold leading-[1.05] tracking-tight">
+            Run the court.<br /><span class="text-optic">Own the
+              kitchen.</span>
+          </h2>
+          <p class="mt-4 max-w-sm text-white/70">Manage bookings,
+            players and courts from one place.</p>
+        </div>
+      </section>
+
+      <!-- Right: form -->
+      <section
+        class="flex items-center justify-center px-6 py-12 bg-court-900">
+        <div class="w-full max-w-md">
+
+          <div class="rise lg:hidden mb-8 flex items-center gap-3">
+            <div
+              class="h-9 w-9 rounded-full bg-optic grid place-items-center">
+              <span
+                class="h-3 w-3 rounded-full bg-court-900"></span>
+            </div>
+            <span
+              class="font-display text-2xl font-extrabold tracking-tight">Dink<span
+                class="text-optic">Hub</span></span>
+          </div>
+
+          <h1
+            class="rise font-display text-4xl font-extrabold tracking-tight"
+            style="--d:150ms">Welcome back, coach.</h1>
+          <p class="rise mt-2 text-white/60" style="--d:250ms">Sign in
+            with your account to continue.</p>
+
+          <div id="alert" role="alert" aria-live="polite"
+            class="alert-in hidden mt-6 rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"></div>
+          <div id="notice" aria-live="polite"
+            class="alert-in hidden mt-6 rounded-xl border border-optic/40 bg-optic/10 px-4 py-3 text-sm text-optic"></div>
+
+          <form id="loginForm" class="mt-8 space-y-5" novalidate>
+            <div class="rise" style="--d:330ms">
+              <label for="email"
+                class="mb-2 block text-sm font-medium text-white/80">Email</label>
+              <input id="email" type="email" autocomplete="email"
+                required placeholder="admin@dinkhub.com"
+                class="w-full rounded-xl border border-white/10 bg-court-800 px-4 py-3 text-white placeholder-white/30 outline-none transition duration-300 hover:border-white/25 focus:-translate-y-0.5 focus:border-optic focus:bg-court-700/60 focus:ring-4 focus:ring-optic/15" />
+            </div>
+
+            <div class="rise" style="--d:420ms">
+              <div class="mb-2 flex items-center justify-between">
+                <label for="password"
+                  class="text-sm font-medium text-white/80">Password</label>
+                <button type="button" id="forgotBtn"
+                  class="text-sm text-optic hover:underline">Forgot
+                  password?</button>
+              </div>
+              <div class="relative">
+                <input id="password" type="password"
+                  autocomplete="current-password" required
+                  placeholder="••••••••"
+                  class="w-full rounded-xl border border-white/10 bg-court-800 px-4 py-3 pr-14 text-white placeholder-white/30 outline-none transition duration-300 hover:border-white/25 focus:-translate-y-0.5 focus:border-optic focus:bg-court-700/60 focus:ring-4 focus:ring-optic/15" />
+                <button type="button" id="togglePw"
+                  aria-label="Show password"
+                  class="absolute inset-y-0 right-0 px-4 text-white/50 transition hover:text-optic focus:outline-none focus:text-optic">
+                  <i id="togglePwIcon"
+                    class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <label for="remember"
+              class="rise group flex cursor-pointer select-none items-center justify-between gap-4 rounded-xl border border-white/10 bg-court-800/60 px-4 py-3 transition duration-300 hover:border-optic/40 hover:bg-court-800"
+              style="--d:510ms">
+              <span class="flex items-center gap-3">
+                <span
+                  class="grid h-9 w-9 place-items-center rounded-full bg-optic/10 text-optic transition duration-300 group-hover:bg-optic/20">
+                  <i
+                    class="fa-solid fa-bolt text-sm transition-transform duration-300 group-hover:scale-125 group-hover:-rotate-12"></i>
+                </span>
+                <span>
+                  <span
+                    class="block text-sm font-medium text-white/90">Remember
+                    me</span>
+                  <span
+                    class="block text-xs text-white/45">Stay
+                    signed in on this device</span>
+                </span>
+              </span>
+
+              <input id="remember" type="checkbox"
+                class="peer sr-only" />
+              <span
+                class="relative h-7 w-12 shrink-0 rounded-full bg-white/10 transition-colors duration-300 peer-checked:bg-optic peer-focus-visible:ring-2 peer-focus-visible:ring-optic/60 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-md after:transition-all after:duration-300 after:ease-[cubic-bezier(.34,1.56,.64,1)] group-active:after:w-6 peer-checked:after:translate-x-5 peer-checked:after:bg-court-900 peer-checked:group-active:after:translate-x-4"></span>
+            </label>
+
+            <button id="submitBtn" type="submit" style="--d:600ms"
+              class="rise group flex w-full items-center justify-center gap-2 rounded-xl bg-optic px-4 py-3.5 font-display text-base font-bold text-court-900 transition duration-300 hover:-translate-y-0.5 hover:bg-optic-dark hover:shadow-lg hover:shadow-optic/25 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-optic/50 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none">
+              <svg id="spinner"
+                class="hidden h-5 w-5 animate-spin"
+                viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10"
+                  stroke="currentColor" stroke-width="4"
+                  class="opacity-25" />
+                <path d="M4 12a8 8 0 018-8"
+                  stroke="currentColor" stroke-width="4"
+                  stroke-linecap="round" />
+              </svg>
+              <span id="submitLabel">Sign in</span>
+              <i id="submitArrow"
+                class="fa-solid fa-arrow-right text-sm transition-transform duration-300 group-hover:translate-x-1.5"></i>
+            </button>
+          </form>
+
+          <p class="rise mt-8 text-center text-xs text-white/40"
+            style="--d:700ms">
+            Restricted area. Unauthorized access attempts are
+            blocked.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Success loading overlay -->
+    <div id="successOverlay"
+      class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-court-900"
+      aria-live="polite">
+      <svg class="ball w-24 h-24 drop-shadow-2xl" viewBox="0 0 100 100"
+        aria-hidden="true">
+        <circle cx="50" cy="50" r="46" fill="#d7ff3f" />
+        <g fill="#0b2a24" fill-opacity=".85">
+          <circle cx="50" cy="22" r="5" /><circle cx="28" cy="34"
+            r="5" /><circle cx="72" cy="34" r="5" />
+          <circle cx="50" cy="48" r="5" /><circle cx="24" cy="58"
+            r="5" /><circle cx="76" cy="58" r="5" />
+          <circle cx="38" cy="72" r="5" /><circle cx="62" cy="72"
+            r="5" />
+        </g>
+      </svg>
+      <div
+        class="ball-shadow mt-3 h-2.5 w-16 rounded-full bg-black"></div>
+      <h2
+        class="mt-8 font-display text-3xl font-extrabold tracking-tight">Login
+        successful</h2>
+      <p class="mt-2 text-white/60">Preparing your dashboard...</p>
+      <div
+        class="mt-6 h-1.5 w-56 overflow-hidden rounded-full bg-white/10">
+        <div id="loadBar" class="h-full rounded-full bg-optic"></div>
+      </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics.js";
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      setPersistence,
+      browserLocalPersistence,
+      browserSessionPersistence,
+      sendPasswordResetEmail,
+      onAuthStateChanged,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import {
+      getDatabase,
+      ref,
+      query,
+      orderByChild,
+      equalTo,
+      get,
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
+    // Config, admin UID and redirect live in firebase-config.js.
+    const {
+      firebase: firebaseConfig,
+      adminUid: ADMIN_UID,
+      adminRedirect: ADMIN_REDIRECT,
+    } = window.APP_CONFIG;
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app); // needs "databaseURL" in firebase-config.js
+    // Where each non-admin role lands after signing in.
+    const ROLE_REDIRECTS = {
+      referee: "referee/referee.html",
+      operator: "operator/operator.html",
+    };
+    isSupported().then((ok) => ok && getAnalytics(app)).catch(() => {});
+
+    const $ = (id) => document.getElementById(id);
+    const form = $("loginForm");
+    const emailEl = $("email");
+    const pwEl = $("password");
+    const rememberEl = $("remember");
+
+    // Pre-fill the email if the admin chose "Remember me" last time.
+    try {
+      const savedEmail = localStorage.getItem("dinkhub_admin_email");
+      if (savedEmail) {
+        emailEl.value = savedEmail;
+        rememberEl.checked = true;
+      }
+    } catch (_) {}
+    const alertEl = $("alert");
+    const noticeEl = $("notice");
+    const submitBtn = $("submitBtn");
+    const spinner = $("spinner");
+    const submitLabel = $("submitLabel");
+
+    const showError = (msg) => {
+      noticeEl.classList.add("hidden");
+      alertEl.textContent = msg;
+      alertEl.classList.remove("hidden", "shake");
+      void alertEl.offsetWidth; // restart the shake each time an error shows
+      alertEl.classList.add("shake");
+    };
+    const showNotice = (msg) => {
+      alertEl.classList.add("hidden");
+      noticeEl.textContent = msg;
+      noticeEl.classList.remove("hidden");
+    };
+    const clearMessages = () => {
+      alertEl.classList.add("hidden");
+      noticeEl.classList.add("hidden");
+    };
+    const setLoading = (loading, label = "Sign in") => {
+      submitBtn.disabled = loading;
+      spinner.classList.toggle("hidden", !loading);
+      $("submitArrow").classList.toggle("hidden", loading);
+      submitLabel.textContent = loading ? "Signing in..." : label;
+    };
+
+    const friendlyError = (code) => {
+      switch (code) {
+        case "auth/invalid-email": return "That email address looks invalid.";
+        case "auth/user-disabled": return "This account has been disabled.";
+        case "auth/user-not-found":
+        case "auth/wrong-password":
+        case "auth/invalid-credential": return "Incorrect email or password.";
+        case "auth/too-many-requests": return "Too many attempts. Please wait a moment and try again.";
+        case "auth/network-request-failed": return "Network error. Check your connection and try again.";
+        default: return "Something went wrong. Please try again.";
+      }
+    };
+
+    // Fade-in loading screen, then fade the page out and redirect.
+    let redirecting = false;
+    const playSuccessTransition = (destination) => {
+      if (redirecting) return;
+      redirecting = true;
+      $("successOverlay").classList.add("show");
+      $("loadBar").classList.add("load-bar");
+      setTimeout(() => document.body.classList.add("fade-out"), 1800);
+      setTimeout(() => window.location.replace(destination), 2400);
+    };
+
+    // Look up the account record in Realtime Database by email (records are keyed by push ID, not UID).
+    const getAccountByEmail = async (email) => {
+      const q = query(ref(db, "accounts"), orderByChild("email"), equalTo(email.toLowerCase()));
+      const snap = await get(q);
+      if (!snap.exists()) return null;
+      let account = null;
+      snap.forEach((child) => { account = child.val(); return true; }); // first match
+      return account;
+    };
+
+    // Single place that decides who gets in and where they go.
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      // The admin goes straight to the dashboard.
+      if (user.uid === ADMIN_UID) {
+        playSuccessTransition(ADMIN_REDIRECT);
+        return;
+      }
+
+      // Everyone else: check their role in the database.
+      try {
+        const account = await getAccountByEmail(user.email || "");
+        const destination = account && account.status === "active" && ROLE_REDIRECTS[account.role];
+        if (destination) {
+          playSuccessTransition(destination);
+          return;
+        }
+        await signOut(auth);
+        setLoading(false);
+        showError(
+          account && account.status !== "active"
+            ? "This account is not active. Please contact the admin."
+            : "Access denied. Your account has no access to this area."
+        );
+      } catch (err) {
+        console.error(err);
+        await signOut(auth);
+        setLoading(false);
+        showError("Could not verify your account role. Please try again.");
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearMessages();
+
+      const email = emailEl.value.trim();
+      const password = pwEl.value;
+      if (!email || !password) {
+        showError("Please enter your email and password.");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Remember me: stay signed in across browser restarts; otherwise only for this tab/session.
+        await setPersistence(auth, rememberEl.checked ? browserLocalPersistence : browserSessionPersistence);
+        try {
+          if (rememberEl.checked) localStorage.setItem("dinkhub_admin_email", email);
+          else localStorage.removeItem("dinkhub_admin_email");
+        } catch (_) {}
+        await signInWithEmailAndPassword(auth, email, password);
+        // onAuthStateChanged handles the redirect / admin check.
+      } catch (err) {
+        setLoading(false);
+        showError(friendlyError(err.code));
+      }
+    });
+
+    $("togglePw").addEventListener("click", (e) => {
+      const hidden = pwEl.type === "password";
+      pwEl.type = hidden ? "text" : "password";
+      const icon = $("togglePwIcon");
+      icon.className = hidden ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+      void icon.offsetWidth;
+      icon.classList.add("icon-pop");
+      e.currentTarget.setAttribute("aria-label", hidden ? "Hide password" : "Show password");
+    });
+
+    $("forgotBtn").addEventListener("click", async () => {
+      clearMessages();
+      const email = emailEl.value.trim();
+      if (!email) {
+        showError("Enter your email above first, then click Forgot password.");
+        emailEl.focus();
+        return;
+      }
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showNotice("If that email is registered, a reset link is on its way.");
+      } catch (err) {
+        if (err.code === "auth/invalid-email") showError(friendlyError(err.code));
+        else showNotice("If that email is registered, a reset link is on its way.");
+      }
+    });
+  </script>
+  </body>
+</html>
